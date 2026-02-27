@@ -464,7 +464,11 @@ def _load_raw_via_exiftool(image_path: str) -> "Image.Image":
             print(f"[RAW] ExifTool {tag} 失败: {e}")
             continue
 
-    raise Exception(f"无法用 ExifTool 提取 RAW 内嵌图像: {image_path}")
+    raise Exception(
+        f"暂不支持此 RAW 格式（{os.path.basename(image_path)}）。"
+        "Sony A7M5 等相机的 NeXt/Compressed RAW 2 格式目前第三方库尚未完整支持，"
+        "将在后续版本中修复。建议临时使用无压缩 RAW 或 JPEG 格式拍摄。"
+    )
 
 
 # ==================== GPS 提取 ====================

@@ -19,10 +19,11 @@ INSTALLER_ID="Developer ID Installer: James Zhen Yu (JWR6FDB52H)"
 APPLE_ID="james@jamesphotography.com.au"
 TEAM_ID="JWR6FDB52H"
 APP_PASSWORD=$(security find-generic-password -a "${APPLE_ID}" -s "SuperPicky-Notarize" -w)
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-PKG_NAME="${APP_NAME}_v${VERSION}_Intel_Installer.pkg"
-DMG_NAME="${APP_NAME}_v${VERSION}_Intel.dmg"
-
+ARCH_TAG="Intel"
+PKG_NAME="${APP_NAME}_v${VERSION}_${ARCH_TAG}_${COMMIT_HASH}_Installer.pkg"
+DMG_NAME="${APP_NAME}_v${VERSION}_${ARCH_TAG}_${COMMIT_HASH}.dmg"
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -60,8 +61,7 @@ log_info "激活 Conda 环境..."
 source /usr/local/Caskroom/miniconda/base/etc/profile.d/conda.sh
 conda activate superpicky312
 
-# 注入 Git Commit Hash
-COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+# 注入 Git Commit Hash 到 build_info.py（COMMIT_HASH 已在顶部配置区获取）
 BUILD_INFO_FILE="core/build_info.py"
 BUILD_INFO_BACKUP="${BUILD_INFO_FILE}.backup"
 cp "${BUILD_INFO_FILE}" "${BUILD_INFO_BACKUP}"
@@ -118,8 +118,8 @@ fi
 log_step "步骤 3/8: 代码签名"
 
 log_info "签名嵌入的库和框架..."
-find "${APP_PATH}/Contents" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +111 \) \
-    -exec codesign --force --sign "${DEVELOPER_ID}" --timestamp --options runtime {} \; 2>/dev/null || true
+find "${APP_PATH}/Contents" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +111 \) -print0 | \
+    xargs -0 -P 8 -I {} codesign --force --sign "${DEVELOPER_ID}" --timestamp --options runtime {} 2>/dev/null || true
 
 log_info "签名主应用..."
 codesign --force --deep --sign "${DEVELOPER_ID}" \
@@ -501,7 +501,7 @@ cat > welcome.html << 'WELCOME_EOF'
 
     <h3>System Requirements</h3>
     <ul>
-        <li>macOS 11.0 (Big Sur) or later</li>
+        <li>macOS 12.0 (Monterey) or later</li>
         <li>Apple Silicon (M1/M2/M3/M4) or Intel processor</li>
         <li>Approximately 2GB of available disk space</li>
     </ul>
@@ -605,10 +605,10 @@ cat > distribution.xml << DISTRIBUTION_EOF
     <title>慧眼选鸟 SuperPicky</title>
     <organization>com.jamesphotography</organization>
     <domains enable_localSystem="true"/>
-    <options customize="never" require-scripts="false" hostArchitectures="x86_64"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
 
     <welcome file="welcome.html" mime-type="text/html"/>
-    <license file="LICENSE.txt" mime-type="text/plain"/>
+    <license file="LICENSE" mime-type="text/plain"/>
     <conclusion file="conclusion.html" mime-type="text/html"/>
 
     <choices-outline>

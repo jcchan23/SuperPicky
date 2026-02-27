@@ -44,9 +44,57 @@ def raw_to_jpeg(raw_file_path):
             # 成功转换——已由 photo_processor 的批量日志统计，无需逐文件记录
             
             return jpg_file_path  # 返回完整路径
+    except rawpy._rawpy.LibRawFileUnsupportedError:
+        # LibRaw 不支持的格式（如 Sony A7M5 NeXt/Compressed RAW 2）
+        # 回退：使用 exiftool -b -JpgFromRaw 提取相机内嵌 JPEG
+        return _raw_to_jpeg_via_exiftool(raw_file_path, jpg_file_path, directory_path)
     except Exception as e:
         log_message(f"Error occurred while converting the RAW file:{raw_file_path}, Error: {e}", directory_path)
         raise e  # 抛出异常供调用者捕获
+
+
+def _raw_to_jpeg_via_exiftool(raw_file_path, jpg_file_path, directory_path):
+    """
+    使用 ExifTool 从 RAW 提取内嵌 JPEG。
+    用于 LibRaw 不支持的格式（如 Sony A7M5 NeXt/Compressed RAW 2）。
+    """
+    import subprocess
+    import sys
+
+    # 查找 exiftool（同 exiftool_manager 逻辑）
+    possible_paths = []
+    if getattr(sys, "frozen", False):
+        possible_paths.append(os.path.join(sys._MEIPASS, "exiftools_mac", "exiftool"))
+    possible_paths += [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "exiftools_mac", "exiftool"),
+        "/opt/homebrew/bin/exiftool",
+        "/usr/local/bin/exiftool",
+        "exiftool",
+    ]
+    exiftool = next((p for p in possible_paths if os.path.isfile(p)), "exiftool")
+
+    for tag in ["-JpgFromRaw", "-PreviewImage", "-ThumbnailImage"]:
+        try:
+            result = subprocess.run(
+                [exiftool, "-b", tag, raw_file_path],
+                capture_output=True, timeout=15
+            )
+            if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
+                with open(jpg_file_path, "wb") as f:
+                    f.write(result.stdout)
+                log_message(f"ExifTool {tag} fallback OK: {os.path.basename(raw_file_path)}", directory_path)
+                return jpg_file_path
+        except Exception as e:
+            log_message(f"ExifTool {tag} fallback failed for {os.path.basename(raw_file_path)}: {e}", directory_path)
+            continue
+
+    # 所有方法均失败——记录友好信息，不 raise 让流程继续
+    log_message(
+        f"暂不支持此 RAW 格式 ({os.path.basename(raw_file_path)})，"
+        "将在后续版本修复。建议使用无压缩 RAW 或 JPEG 拍摄。",
+        directory_path
+    )
+    return None
 
 def reset(directory, log_callback=None, i18n=None):
     """

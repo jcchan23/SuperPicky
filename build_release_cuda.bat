@@ -12,7 +12,7 @@ call "%~dp0.venv\Scripts\activate.bat"
 if errorlevel 1 exit /b 1
 
 set "OUT_DIST_DIR=dist_cuda"
-call "%~dp0build_release.bat" "%VERSION_ARG%" "E:\_SuperPickyVersions"
+call "%~dp0build_release.bat" "%VERSION_ARG%" "output\win64_cuda"
 set "RET=%ERRORLEVEL%"
 
 call "%~dp0.venv\Scripts\deactivate.bat" >nul 2>&1

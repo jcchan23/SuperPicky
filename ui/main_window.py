@@ -776,23 +776,20 @@ class SuperPickyMainWindow(QMainWindow):
         self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
     
     def _quit_app(self):
-        """完全退出应用"""
+        """完全退出应用（清理由 aboutToQuit 信号统一处理）"""
         self._really_quit = True
-        
-        # 停止识鸟服务器
-        if hasattr(self, '_birdid_server_process') and self._birdid_server_process:
-            try:
-                self._birdid_server_process.terminate()
-                self._birdid_server_process.wait(timeout=2)
-            except Exception:
-                pass
-        
-        # 隐藏托盘图标
         if hasattr(self, 'tray_icon'):
-            self.tray_icon.hide()
-        
-        # 退出应用
-        QApplication.quit()
+            self.tray_icon.hide()         # 先隐藏托盘，避免用户二次点击
+        QApplication.quit()               # 触发 aboutToQuit → _cleanup_on_quit
+
+    def _cleanup_on_quit(self):
+        """统一退出清理（由 app.aboutToQuit 信号调用）
+        无论通过 X按鈕 / Cmd+Q / 托盘退出，都会经过此处。
+        Mac 和 Windows 均适用。
+        """
+        self._stop_birdid_server()        # 停止 Flask/BirdID 进程
+        if hasattr(self, 'tray_icon') and self.tray_icon:
+            self.tray_icon.hide()         # 清托盘图标（备用，_quit_app 已调过一次也无害）
 
     def _minimize_to_tray(self):
         """V4.0: 进入后台模式（服务器继续运行，GUI 完全退出）"""
@@ -2327,7 +2324,7 @@ class SuperPickyMainWindow(QMainWindow):
             else:
                 event.ignore()
         else:
-            self._stop_birdid_server()  # V4.0: 停止识鸟 API 服务
+            QApplication.quit()           # 触发 aboutToQuit → _cleanup_on_quit
             event.accept()
 
     # ========== V4.2: 模型预加载功能 ==========

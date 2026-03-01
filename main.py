@@ -92,7 +92,7 @@ def main():
     app.setOrganizationDomain("jamesphotography.com.au")
 
     # 防止隐藏主窗口（切到结果浏览器时）触发 Qt 自动退出
-    # 退出由托盘菜单"退出"或 _quit_app() 显式控制
+    # 退出由托盘菜单"退出"或 _quit_app() 显式控制，统一走 aboutToQuit 清理
     app.setQuitOnLastWindowClosed(False)
     
     # 设置应用图标
@@ -119,6 +119,8 @@ def main():
     if _main_window is None:
         _main_window = SuperPickyMainWindow()
         _main_window.show()
+        # 统一退出清理：无论通过 X / 托盘 / Cmd+Q 退出，都会经由 aboutToQuit 信号
+        app.aboutToQuit.connect(_main_window._cleanup_on_quit)
     else:
         print("⚠️  检测到已存在的主窗口实例")
         _main_window.raise_()

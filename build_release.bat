@@ -258,8 +258,24 @@ if !BUILD_RC! NEQ 0 exit /b !BUILD_RC!
 rem Default: always create one release ZIP
 if "%BUILD_ZIP%"=="1" (
     set "ZIP_NAME=!APP_NAME!_v!VERSION!_Win64.zip"
+    
+    rem Remove Inno Setup files before creating zip
+    if exist "!DIST_DIR!\!APP_NAME!\SuperPicky.iss" del /q "!DIST_DIR!\!APP_NAME!\SuperPicky.iss" >nul 2>&1
+    if exist "!DIST_DIR!\!APP_NAME!\ChineseSimplified.isl" del /q "!DIST_DIR!\!APP_NAME!\ChineseSimplified.isl" >nul 2>&1
+    
     call :zip_dir "!DIST_DIR!\!APP_NAME!" "!DIST_DIR!\!ZIP_NAME!"
     if errorlevel 1 exit /b 1
+    
+    rem Restore Inno Setup files after creating zip
+    if exist "%INNO_DIR%\SuperPicky.iss" (
+        copy /y "%INNO_DIR%\SuperPicky.iss" "!DIST_DIR!\!APP_NAME!\SuperPicky.iss" >nul
+        rem Update version in iss file
+        powershell -NoProfile -Command "(Get-Content -Path '!DIST_DIR!\!APP_NAME!\SuperPicky.iss' -Raw -Encoding UTF8) -replace 'VersionInfoVersion=.*', 'VersionInfoVersion=!VERSION!' | Set-Content -Path '!DIST_DIR!\!APP_NAME!\SuperPicky.iss' -Encoding UTF8"
+    )
+    if exist "%INNO_DIR%\ChineseSimplified.isl" (
+        copy /y "%INNO_DIR%\ChineseSimplified.isl" "!DIST_DIR!\!APP_NAME!\ChineseSimplified.isl" >nul
+    )
+    
     if defined ZIP_COPY_DIR (
         set "TARGET_SUBDIR=%APP_NAME%_!VERSION!"
         set "TARGET_DIR=!ZIP_COPY_DIR!\!TARGET_SUBDIR!"
@@ -303,8 +319,23 @@ if "%BUILD_ZIP%"=="1" (
             echo [SUCCESS] Copied ChineseSimplified.isl to !TARGET_DIR!
         )
         
+        rem Remove Inno Setup files before creating zip
+        if exist "!TARGET_DIR!\SuperPicky.iss" del /q "!TARGET_DIR!\SuperPicky.iss" >nul 2>&1
+        if exist "!TARGET_DIR!\ChineseSimplified.isl" del /q "!TARGET_DIR!\ChineseSimplified.isl" >nul 2>&1
+        
         call :zip_dir "!TARGET_DIR!" "!ZIP_COPY_DIR!\!TARGET_SUBDIR!.zip"
         if errorlevel 1 exit /b 1
+        
+        rem Restore Inno Setup files after creating zip
+        if exist "%INNO_DIR%\SuperPicky.iss" (
+            copy /y "%INNO_DIR%\SuperPicky.iss" "!TARGET_DIR!\SuperPicky.iss" >nul
+            rem Update version in iss file
+            powershell -NoProfile -Command "(Get-Content -Path '!TARGET_DIR!\SuperPicky.iss' -Raw -Encoding UTF8) -replace 'VersionInfoVersion=.*', 'VersionInfoVersion=!VERSION!' | Set-Content -Path '!TARGET_DIR!\SuperPicky.iss' -Encoding UTF8"
+        )
+        if exist "%INNO_DIR%\ChineseSimplified.isl" (
+            copy /y "%INNO_DIR%\ChineseSimplified.isl" "!TARGET_DIR!\ChineseSimplified.isl" >nul
+        )
+        
         echo [SUCCESS] Copied !TARGET_SUBDIR! + created !ZIP_COPY_DIR!\!TARGET_SUBDIR!.zip
     )
 ) else (

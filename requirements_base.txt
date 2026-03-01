@@ -17,3 +17,5 @@ flask>=3.1.2
 flask_cors>=6.0.2
 
 imagehash
+
+tzdata

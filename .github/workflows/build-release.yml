@@ -40,7 +40,7 @@ jobs:
     - name: Download Model
       run: |
         .venv\Scripts\Activate.ps1
-        python scripts/download_model.py
+        python scripts\download_models.py
 
     - name: Build CPU version
       run: |

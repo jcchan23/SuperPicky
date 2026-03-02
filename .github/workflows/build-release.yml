@@ -42,6 +42,11 @@ jobs:
         .venv\Scripts\Activate.ps1
         python scripts\download_models.py
 
+    - name: Update version For Inno Setup
+      run: |
+        .venv\Scripts\Activate.ps1
+        python scripts\update_version.py 
+
     - name: Build CPU version
       run: |
         .venv\Scripts\Activate.ps1

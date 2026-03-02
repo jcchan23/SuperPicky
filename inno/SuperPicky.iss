@@ -1,6 +1,6 @@
 [Setup]
 AppName=SuperPicky
-AppVersion=4.1.0.b2
+AppVersion=4.1.0-lts
 DefaultDirName={commonpf}\SuperPicky
 DefaultGroupName=SuperPicky
 AppPublisherURL=https://superpicky.app/

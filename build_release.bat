@@ -118,8 +118,8 @@ echo [========================================]
 
 set "COMMIT_HASH=unknown"
 rem 优先从 Python 代码读取 COMMIT_HASH（保证跨平台一致）
-for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "exec('try:\n from core.build_info_local import COMMIT_HASH\nexcept ImportError:\n from core.build_info import COMMIT_HASH\nprint(COMMIT_HASH or chr(0))')" 2^>nul') do set "COMMIT_HASH=%%i"
-if "%COMMIT_HASH%"=="" for /f "tokens=*" %%i in ('git rev-parse --short HEAD 2^>nul') do set "COMMIT_HASH=%%i"
+for /f "tokens=*" %%i in ('git rev-parse --short HEAD 2^>nul') do set "COMMIT_HASH=%%i"
+if "%COMMIT_HASH%"=="" for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "exec('try:\n from core.build_info_local import COMMIT_HASH\nexcept ImportError:\n from core.build_info import COMMIT_HASH\nprint(COMMIT_HASH or chr(0))')" 2^>nul') do set "COMMIT_HASH=%%i"
 if "%COMMIT_HASH%"=="" set "COMMIT_HASH=unknown"
 echo [INFO] Commit hash: %COMMIT_HASH%
 

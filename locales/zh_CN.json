@@ -871,6 +871,7 @@
     "stats_flying": "🔵 飞版: {count}",
     "btn_screenshot": "截图识别",
     "screenshot_hint": "请截图，完成后自动识别...",
+    "click_to_copy": "点击复制鸟名", 
     "stats_focus_precise": "🟢 精焦: {count}",
     "stats_species": "🦜 {count} 种: {names}"
   },

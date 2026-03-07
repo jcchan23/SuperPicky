@@ -28,6 +28,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QObject, Slot, QTimer, QPropertyAnimation, QEasingCurve, QMimeData, QThread
 from PySide6.QtGui import QFont, QPixmap, QIcon, QAction, QTextCursor, QColor, QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import QCompleter
+from PySide6.QtCore import QStringListModel
 
 from tools.i18n import get_i18n
 from advanced_config import get_advanced_config
@@ -43,10 +45,16 @@ from ui.skill_level_dialog import SkillLevelDialog, SKILL_PRESETS, get_skill_lev
 class DropLineEdit(QLineEdit):
     """支持拖放目录的 QLineEdit"""
     pathDropped = Signal(str)  # 拖放目录后发射此信号
+    focusGained = Signal()     # 聚焦时发射，供主窗口刷新 QCompleter 数据
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
+    
+    def focusInEvent(self, event):
+        """聚焦时发射信号，让主窗口更新 completer 列表"""
+        super().focusInEvent(event)
+        self.focusGained.emit()
     
     def dragEnterEvent(self, event: QDragEnterEvent):
         """验证拖入的内容"""
@@ -690,8 +698,6 @@ class SuperPickyMainWindow(QMainWindow):
 
         # 识鸟菜单
         birdid_menu = menubar.addMenu(self.i18n.t("menu.birdid"))
-        
-
 
         # 识鸟面板（可勾选显示/隐藏）
         self.birdid_dock_action = QAction(self.i18n.t("menu.toggle_dock"), self)
@@ -699,8 +705,10 @@ class SuperPickyMainWindow(QMainWindow):
         self.birdid_dock_action.setChecked(True)
         self.birdid_dock_action.triggered.connect(self._toggle_birdid_dock)
         birdid_menu.addAction(self.birdid_dock_action)
-        
 
+        # ── 最近目录子菜单 ──────────────────────────────────
+        self._recent_menu = menubar.addMenu(self.i18n.t("menu.recent_dirs"))
+        self._refresh_recent_menu()
 
         # 设置菜单
         settings_menu = menubar.addMenu(self.i18n.t("menu.settings_menu"))
@@ -750,6 +758,38 @@ class SuperPickyMainWindow(QMainWindow):
         about_action = QAction(self.i18n.t("menu.about"), self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
+
+    def _refresh_recent_menu(self):
+        """重建「最近目录」子菜单内容（每次选目录后调用）。"""
+        if not hasattr(self, '_recent_menu'):
+            return
+        self._recent_menu.clear()
+        dirs = self.config.get_recent_directories()
+        offline_prefix = self.i18n.t("menu.recent_dirs_offline")  # "(脱机)" or "(Offline)"
+        if dirs:
+            for d in dirs:
+                available = os.path.isdir(d)
+                label = d if available else f"{offline_prefix} {d}"
+                action = QAction(label, self)
+                if available:
+                    action.triggered.connect(lambda checked=False, path=d: self._handle_directory_selection(path))
+                else:
+                    action.triggered.connect(
+                        lambda checked=False, msg=self.i18n.t("messages.dir_unavailable"):
+                        self._show_message(self.i18n.t("messages.warning"), msg, "warning")
+                    )
+                self._recent_menu.addAction(action)
+            self._recent_menu.addSeparator()
+        # 清除历史按钮
+        clear_action = QAction(self.i18n.t("menu.recent_dirs_clear"), self)
+        clear_action.triggered.connect(self._clear_recent_directories)
+        self._recent_menu.addAction(clear_action)
+
+    def _clear_recent_directories(self):
+        """清空最近目录历史。"""
+        self.config.config["recent_directories"] = []
+        self.config.save()
+        self._refresh_recent_menu()
 
     def _setup_ui(self):
         """设置主 UI"""
@@ -1061,7 +1101,8 @@ class SuperPickyMainWindow(QMainWindow):
         self.dir_input.setPlaceholderText(self.i18n.t("labels.dir_placeholder"))
         self.dir_input.returnPressed.connect(self._on_path_entered)
         self.dir_input.editingFinished.connect(self._on_path_entered)  # V3.9: 失焦时也验证
-        self.dir_input.pathDropped.connect(self._on_path_dropped)  # V3.9: 拖放目录
+        self.dir_input.pathDropped.connect(self._on_path_dropped)     # V3.9: 拖放目录
+        self.dir_input.focusGained.connect(self._update_dir_completer) # 最近目录弹出
         dir_layout.addWidget(self.dir_input, 1)
 
         browse_btn = QPushButton(self.i18n.t("labels.browse"))
@@ -1071,6 +1112,14 @@ class SuperPickyMainWindow(QMainWindow):
         dir_layout.addWidget(browse_btn)
 
         parent_layout.addLayout(dir_layout)
+
+        # QCompleter：聚焦时弹出最近可用目录（最多 3 条）
+        self._dir_completer_model = QStringListModel(self)
+        self._dir_completer = QCompleter(self._dir_completer_model, self)
+        self._dir_completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+        self._dir_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._dir_completer.activated.connect(self._handle_directory_selection)
+        self.dir_input.setCompleter(self._dir_completer)
 
     def _create_parameters_section(self, parent_layout):
         """创建参数设置区域"""
@@ -1409,6 +1458,13 @@ class SuperPickyMainWindow(QMainWindow):
         if directory and os.path.isdir(directory):
             self._handle_directory_selection(directory)
 
+    def _update_dir_completer(self):
+        """地址栏聚焦时，用最近 3 个可用目录更新 QCompleter。"""
+        available = self.config.get_available_recent_directories(n=3)
+        self._dir_completer_model.setStringList(available)
+        if available:
+            self._dir_completer.complete()
+
     def _handle_directory_selection(self, directory):
         """处理目录选择"""
         # V3.9: 归一化路径并防止重复
@@ -1420,6 +1476,10 @@ class SuperPickyMainWindow(QMainWindow):
         self.dir_input.setText(directory)
 
         self._log(self.i18n.t("messages.dir_selected", directory=directory))
+
+        # 写入最近目录历史并刷新菜单
+        self.config.add_recent_directory(directory)
+        self._refresh_recent_menu()
 
         # 状态条 + 按钮由 _check_report_csv 根据是否有历史数据决定
         # 重置弹窗移到「重新处理」按钮点击时再询问（_reset_directory 保留确认逻辑）

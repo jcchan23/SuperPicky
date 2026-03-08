@@ -1,11 +1,11 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-IQA scorer (ONNX backend).
+IQA 评分器（ONNX 后端）。
 
-This module mirrors iqa_scorer.py public API while replacing PyTorch
-TOPIQ inference with ONNX Runtime model:
-- models/cfanet_iaa_ava_res50.onnx
+该模块保持 `iqa_scorer.py` 的公开接口不变，但将 PyTorch TOPIQ 推理
+替换为 ONNX Runtime 模型：
+- `models/cfanet_iaa_ava_res50.onnx`
 """
 
 import argparse
@@ -20,6 +20,7 @@ from PIL import Image
 
 
 def _ensure_utf8_stdout() -> None:
+    """尽量把命令行标准输出切到 UTF-8，减少 Windows 下中文乱码。"""
     try:
         if hasattr(sys.stdout, "reconfigure"):
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -30,6 +31,11 @@ def _ensure_utf8_stdout() -> None:
 
 
 def _get_topiq_onnx_path() -> str:
+    """
+    查找 TOPIQ ONNX 模型路径。
+
+    同时兼容 PyInstaller 打包环境和开发环境目录结构。
+    """
     model_name = "cfanet_iaa_ava_res50.onnx"
 
     search_paths = []
@@ -50,9 +56,15 @@ def _get_topiq_onnx_path() -> str:
 
 
 class IQAScorer:
-    """IQA scorer using ONNX TOPIQ model."""
+    """IQA 评分器，使用 ONNX 版 TOPIQ 模型。"""
 
     def __init__(self, device: str = "mps"):
+        """
+        初始化评分器。
+
+        Args:
+            device: 期望设备类型，兼容 `mps` / `cuda` / `cpu`。
+        """
         self.requested_device = device
         self._session: Optional[ort.InferenceSession] = None
         self._input_name: Optional[str] = None
@@ -62,13 +74,19 @@ class IQAScorer:
 
     @staticmethod
     def _resolve_providers(preferred: str):
+        """
+        解析 ORT provider 顺序。
+
+        `mps` 请求在 ONNX Runtime 中通常映射到 CoreML；若不可用则尝试 CUDA，
+        最后统一回退到 CPU。
+        """
         available = set(ort.get_available_providers())
 
         providers = []
         if preferred in ("cuda", "gpu") and "CUDAExecutionProvider" in available:
             providers.append("CUDAExecutionProvider")
 
-        # MPS execution provider is generally unavailable in most ORT wheels.
+        # 大多数 ORT wheel 并不直接提供 MPS EP；项目里用 CoreML 近似对应。
         if preferred == "mps":
             if "CoreMLExecutionProvider" in available:
                 providers.append("CoreMLExecutionProvider")
@@ -82,6 +100,11 @@ class IQAScorer:
         return providers
 
     def _load_topiq(self):
+        """
+        延迟加载 TOPIQ ONNX session。
+
+        若 GPU/CoreML provider 初始化失败，则自动回退为 CPU-only session。
+        """
         if self._session is not None:
             return self._session
 
@@ -89,7 +112,6 @@ class IQAScorer:
         try:
             self._session = ort.InferenceSession(model_path, providers=self._providers)
         except Exception as exc:
-            # Fallback to CPU-only if GPU EP init fails.
             print(f"[IQA ONNX] CUDA init failed, fallback to CPU: {exc}")
             self._session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
         print(f"[IQA ONNX] session provider: {self._session.get_providers()}")
@@ -107,6 +129,11 @@ class IQAScorer:
 
     @staticmethod
     def _preprocess_pil(img: Image.Image) -> np.ndarray:
+        """
+        图像预处理。
+
+        与原版保持相同的 384x384 输入尺寸，输出 ONNX 所需的 NCHW float32。
+        """
         img = img.convert("RGB").resize((384, 384), Image.LANCZOS)
         arr = np.asarray(img, dtype=np.float32) / 255.0
         arr = np.transpose(arr, (2, 0, 1))  # HWC -> CHW
@@ -114,9 +141,15 @@ class IQAScorer:
         return arr.astype(np.float32)
 
     def calculate_nima(self, image_path: str) -> Optional[float]:
+        """保留旧接口名，内部仍走 TOPIQ 美学评分。"""
         return self.calculate_aesthetic(image_path)
 
     def calculate_aesthetic(self, image_path: str) -> Optional[float]:
+        """
+        计算图片的 TOPIQ 美学分数。
+
+        返回值继续限制在 1.0-10.0 范围内，与旧版上层调用保持一致。
+        """
         if not os.path.exists(image_path):
             print(f"[IQA ONNX] image not found: {image_path}")
             return None
@@ -133,6 +166,7 @@ class IQAScorer:
             return None
 
     def calculate_from_array(self, img_bgr: np.ndarray) -> Optional[float]:
+        """直接从内存中的 BGR 图像计算美学分数。"""
         if img_bgr is None or img_bgr.size == 0:
             return None
 
@@ -151,10 +185,11 @@ class IQAScorer:
             return None
 
     def calculate_brisque(self, image_input) -> Optional[float]:
-        # Deprecated in project, kept for API compatibility.
+        """BRISQUE 在项目中已废弃；该接口仅为兼容保留。"""
         return None
 
     def calculate_both(self, full_image_path: str, crop_image) -> Tuple[Optional[float], Optional[float]]:
+        """返回 `(aesthetic_score, None)`，兼容旧版双评分接口。"""
         aesthetic_score = self.calculate_aesthetic(full_image_path)
         return aesthetic_score, None
 
@@ -163,6 +198,7 @@ _iqa_scorer_instance = None
 
 
 def get_iqa_scorer(device: str = "mps") -> IQAScorer:
+    """获取 IQA 评分器单例。"""
     global _iqa_scorer_instance
     if _iqa_scorer_instance is None:
         _iqa_scorer_instance = IQAScorer(device=device)
@@ -170,15 +206,22 @@ def get_iqa_scorer(device: str = "mps") -> IQAScorer:
 
 
 def calculate_nima(image_path: str) -> Optional[float]:
+    """便捷函数：计算图片美学分数。"""
     scorer = get_iqa_scorer()
     return scorer.calculate_aesthetic(image_path)
 
 
 def calculate_brisque(image_input) -> Optional[float]:
+    """便捷函数：BRISQUE 已废弃，始终返回 None。"""
     return None
 
 
 def _compare_with_torch(image_path: str, device: str) -> int:
+    """
+    与 PyTorch 版 IQA 评分器做结果对比。
+
+    仅用于开发期验证 ONNX 模型与原始实现的分数一致性。
+    """
     _ensure_utf8_stdout()
 
     if not importlib.util.find_spec("torch"):
@@ -214,6 +257,7 @@ def _compare_with_torch(image_path: str, device: str) -> int:
 
 
 if __name__ == "__main__":
+    # 简单命令行入口：执行 ONNX 打分，并可选对比 PyTorch 基线
     _ensure_utf8_stdout()
 
     parser = argparse.ArgumentParser(description="IQA scorer ONNX with optional torch comparison")

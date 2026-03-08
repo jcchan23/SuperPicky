@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import dataclass
 from typing import List, Dict
-import torch
+# import torch
 
 
 def resource_path(relative_path):
@@ -55,7 +55,7 @@ class DirectoryConfig:
 @dataclass
 class AIConfig:
     """AI 模型相关配置"""
-    MODEL_FILE: str = "models/yolo11l-seg.pt"  # 使用 yolo11l-seg 分割模型（已打包）
+    MODEL_FILE: str = "models/yolo11l-seg.onnx"  # 使用 yolo11l-seg 分割模型（已打包）
     BIRD_CLASS_ID: int = 14              # YOLO 模型中鸟类的类别 ID
     TARGET_IMAGE_SIZE: int = 1024        # 图像预处理目标尺寸（保持1024以维持锐度值一致性）
     CENTER_THRESHOLD: float = 0.15       # 鸟类位置中心阈值
@@ -146,19 +146,29 @@ def get_best_device():
     4. 如果不支持就用CPU
     """
     try:
-        # 检查 MPS (Apple GPU)
-        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            return torch.device("mps")
+        # # 检查 MPS (Apple GPU)
+        # if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        #     return torch.device("mps")
         
-        # 检查 CUDA (NVIDIA GPU)
-        if torch.cuda.is_available():
-            return torch.device("cuda")
+        # # 检查 CUDA (NVIDIA GPU)
+        # if torch.cuda.is_available():
+        #     return torch.device("cuda")
         
-        # 默认使用 CPU
-        return torch.device("cpu")
+        # # 默认使用 CPU
+        # return torch.device("cpu")
+
+        import onnxruntime as ort
+        availble_providers = ort.get_available_providers()
+
+        if "CUDAExecutionProvider" in availble_providers:
+            return "cuda"
+        else:
+            return "cpu"
+
     except Exception:
         # 如果 torch 导入失败或其他异常，回退到 CPU
-        return torch.device("cpu")
+        # return torch.device("cpu")
+        return "cpu"
 
 
 # 全局配置实例

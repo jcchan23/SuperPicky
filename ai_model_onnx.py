@@ -1,3 +1,10 @@
+"""
+ONNX 版鸟类检测模块。
+
+作为 `ai_model.py` 的 ONNX 替代实现，使用导出的 YOLO-seg 模型配合
+onnxruntime 执行推理，同时尽量保持旧版接口、返回值和写库字段不变。
+"""
+
 import os
 import time
 import threading
@@ -20,6 +27,8 @@ _MODEL_LOCK = threading.Lock()
 
 @dataclass
 class Detection:
+    """单个检测结果。"""
+
     box: np.ndarray
     conf: float
     cls: int
@@ -27,7 +36,12 @@ class Detection:
 
 
 def _select_providers(preferred_device: Optional[str] = None) -> List[str]:
-    # 优先尝试更快的 provider，但始终保留 CPU 作为最终兜底，避免部署环境差异导致无法加载。
+    """
+    选择 ONNX Runtime providers。
+
+    策略是优先尝试更快的执行后端，但始终保留 CPU 作为最终兜底，
+    避免部署环境差异导致模型无法加载。
+    """
     available = set(ort.get_available_providers())
     providers: List[str] = []
 
@@ -48,6 +62,7 @@ def _select_providers(preferred_device: Optional[str] = None) -> List[str]:
 
 
 def _clip_boxes(boxes: np.ndarray, width: int, height: int) -> np.ndarray:
+    """将边界框裁剪到图像范围内。"""
     if boxes.size == 0:
         return boxes
     boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, max(width - 1, 0))
@@ -56,7 +71,11 @@ def _clip_boxes(boxes: np.ndarray, width: int, height: int) -> np.ndarray:
 
 
 def _build_empty_result_row(image_path: str) -> Dict[str, object]:
-    # V3.1/V3.3: 统一无鸟结果写库格式，保持英文列名兼容结果浏览和历史报表。
+    """
+    构造“未检测到鸟”时的写库占位数据。
+
+    字段名继续沿用英文列名，兼容历史报表和结果浏览器。
+    """
     return {
         "filename": os.path.splitext(os.path.basename(image_path))[0],
         "has_bird": "no",
@@ -71,6 +90,8 @@ def _build_empty_result_row(image_path: str) -> Dict[str, object]:
 
 
 class OnnxYoloSegModel:
+    """YOLO-seg ONNX 推理封装。"""
+
     def __init__(self, model_path: str, preferred_device: Optional[str] = None, imgsz: int = DEFAULT_ONNX_IMGSZ):
         self.model_path = model_path
         self.imgsz = int(imgsz)
@@ -83,11 +104,16 @@ class OnnxYoloSegModel:
         self._load_session(self.providers)
 
     def _load_session(self, providers: Sequence[str]) -> None:
+        """
+        创建 ONNX Runtime Session，并缓存输入输出节点信息。
+
+        当前导出的 YOLO-seg ONNX 固定为 1 个输入、2 个输出：
+        检测结果和 mask proto。
+        """
         requested_providers = list(providers)
         self.session = ort.InferenceSession(self.model_path, providers=requested_providers)
         inputs = self.session.get_inputs()
         outputs = self.session.get_outputs()
-        # 当前导出的 YOLO-seg ONNX 固定为 1 个输入、2 个输出：检测结果 + mask proto。
         if not inputs or len(outputs) != 2:
             raise RuntimeError("Unexpected YOLO ONNX IO signature")
         self.input_name = inputs[0].name
@@ -98,13 +124,19 @@ class OnnxYoloSegModel:
         print(f"[YOLO ONNX] session provider: {self.active_provider} (requested={requested_providers})")
 
     def close(self) -> None:
+        """释放 session 相关引用，便于显式回收。"""
         self.session = None
         self.input_name = None
         self.output_names = []
 
     @staticmethod
     def _letterbox(img_bgr: np.ndarray, new_shape: Tuple[int, int]) -> Tuple[np.ndarray, float, Tuple[float, float]]:
-        # 先按比例缩放，再补边到推理尺寸；后处理依赖 ratio/pad 将框和 mask 映射回处理后图像坐标。
+        """
+        按比例缩放并补边到推理尺寸。
+
+        后处理依赖返回的 `ratio` 和 `pad`，将检测框和掩码映射回
+        `preprocess_image()` 输出图像的坐标系。
+        """
         h0, w0 = img_bgr.shape[:2]
         new_h, new_w = new_shape
         ratio = min(new_h / h0, new_w / w0)
@@ -132,7 +164,12 @@ class OnnxYoloSegModel:
         return out, ratio, (dw, dh)
 
     def _prepare_input(self, image_bgr: np.ndarray, imgsz: Optional[int] = None) -> Tuple[np.ndarray, Dict[str, object]]:
-        # ORT 输入采用 RGB + float32/255 + NCHW，这里把业务层 BGR 图像整理成模型期望格式。
+        """
+        准备 ORT 输入张量。
+
+        业务层图像是 BGR；模型输入需要 RGB、`float32 / 255`、NCHW。
+        同时返回用于后处理的元数据。
+        """
         infer_size = int(imgsz or self.imgsz)
         letterboxed, ratio, (dw, dh) = self._letterbox(image_bgr, (infer_size, infer_size))
         rgb = cv2.cvtColor(letterboxed, cv2.COLOR_BGR2RGB)
@@ -148,7 +185,12 @@ class OnnxYoloSegModel:
 
     @staticmethod
     def _scale_boxes_to_processed_image(boxes_xyxy: np.ndarray, meta: Dict[str, object]) -> np.ndarray:
-        # 模型输出框位于 letterbox 后坐标系，需要去掉 padding 并按缩放比例还原到 preprocess_image() 后的图像。
+        """
+        将 letterbox 坐标系中的框还原到预处理后图像坐标系。
+
+        这里不会恢复到原始文件尺寸，而是对齐 `preprocess_image()` 之后的图像，
+        以兼容后续 `photo_processor` 的缩放链路。
+        """
         boxes = boxes_xyxy.copy()
         dw, dh = meta["pad"]
         ratio = float(meta["ratio"])
@@ -166,7 +208,12 @@ class OnnxYoloSegModel:
         boxes_img_xyxy: np.ndarray,
         meta: Dict[str, object],
     ) -> List[np.ndarray]:
-        # YOLO-seg 的分割结果由 mask coeff 与 proto 线性组合得到，再裁框、去 padding、恢复到业务层图像尺寸。
+        """
+        解码 YOLO-seg 掩码。
+
+        YOLO-seg 的分割结果由 mask coefficient 与 proto 线性组合得到，
+        之后再裁框、去 padding，并恢复到业务层图像尺寸。
+        """
         mask_dim, mask_h, mask_w = proto.shape
         img_h, img_w = meta["img_shape"]
         out_h, out_w = meta["orig_shape"]
@@ -216,12 +263,17 @@ class OnnxYoloSegModel:
         return masks
 
     def _run_session(self, tensor: np.ndarray) -> List[np.ndarray]:
+        """
+        执行 ONNX 推理。
+
+        某些 GPU/CoreML provider 可能在 session 创建成功后仍在实际推理时失败，
+        这里回退到 CPU，保证主流程可继续。
+        """
         if self.session is None or self.input_name is None:
             raise RuntimeError("YOLO ONNX session is not initialized")
         try:
             return self.session.run(self.output_names, {self.input_name: tensor})
         except Exception:
-            # GPU/CoreML provider 初始化成功后仍可能在实际推理时失败，这里回退到 CPU 保持主流程可继续。
             if self.active_provider != "CPUExecutionProvider":
                 self._load_session(["CPUExecutionProvider"])
                 return self.session.run(self.output_names, {self.input_name: tensor})
@@ -234,12 +286,17 @@ class OnnxYoloSegModel:
         class_filter: Optional[Iterable[int]] = None,
         imgsz: Optional[int] = None,
     ) -> List[Detection]:
+        """
+        对单张图像执行检测。
+
+        导出模型要求 `nms=True`，因此 `output0` 已是 NMS 后结果，
+        `output1` 为掩码 proto。
+        """
         if image_bgr is None or image_bgr.size == 0:
             return []
 
         tensor, meta = self._prepare_input(image_bgr, imgsz=imgsz)
         outputs = self._run_session(tensor)
-        # output0 是 NMS 后的检测结果，output1 是分割 proto。
         pred = outputs[0][0]
         proto = outputs[1][0]
 
@@ -261,7 +318,7 @@ class OnnxYoloSegModel:
         class_ids = np.round(pred[:, 5]).astype(np.int32)
         mask_coeffs = pred[:, 6 : 6 + mask_dim].astype(np.float32)
 
-        # 先按业务阈值和类别过滤，再统一封装成 Detection，便于上层复用旧版 ai_model 的处理流程。
+        # 先按业务阈值和类别过滤，再统一封装成 Detection，复用旧版后处理流程
         keep = scores >= float(conf_thres)
         if class_filter is not None:
             filter_set = {int(cls_id) for cls_id in class_filter}
@@ -292,17 +349,20 @@ class OnnxYoloSegModel:
 
 
 def load_yolo_model(log_callback=None):
-    """Load YOLO ONNX model using the best available execution provider."""
+    """
+    加载全局 YOLO ONNX 模型实例。
+
+    模块级缓存让 GUI 预加载和 `photo_processor` 处理阶段复用同一个
+    ONNX session，避免重复初始化。
+    """
     global _MODEL_INSTANCE
-    model_path = config.ai.get_model_path_onnx()
+    model_path = config.ai.get_model_path()
     try:
         from config import get_best_device
-
         preferred_device = get_best_device()
     except Exception:
         preferred_device = "cpu"
 
-    # 模块级缓存让 GUI 预加载和 photo_processor 处理阶段复用同一个 ONNX session。
     with _MODEL_LOCK:
         if _MODEL_INSTANCE is None:
             _MODEL_INSTANCE = OnnxYoloSegModel(str(model_path), preferred_device=preferred_device)
@@ -334,7 +394,12 @@ def load_yolo_model(log_callback=None):
 
 
 def preprocess_image(image_path, target_size=None):
-    """Preprocess image before detection."""
+    """
+    检测前的图像预处理。
+
+    延续旧版 `ai_model.py` 的约定：按最长边缩放到 `TARGET_IMAGE_SIZE`，
+    供后续 bbox、img_dims 和掩码链路共同使用。
+    """
     if target_size is None:
         target_size = config.ai.TARGET_IMAGE_SIZE
 
@@ -342,31 +407,29 @@ def preprocess_image(image_path, target_size=None):
     if img is None:
         raise FileNotFoundError(image_path)
     h, w = img.shape[:2]
-    # 延续旧版 ai_model.py 的预处理约定：最长边缩放到 TARGET_IMAGE_SIZE，供后续 bbox/img_dims 联动使用。
     scale = target_size / max(w, h)
     return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
 
 def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n=None, skip_nima=False, focus_point=None, report_db=None):
     """
-    Detect birds and draw debug boxes using ONNX YOLO segmentation.
+    检测鸟并输出调试框。
 
-    V4.2: 保持多鸟 + focus_point 选鸟语义。
-    V4.1: 保持 yolo_debug_path 调试图输出和写库字段。
-
-    Returns:
-        (found_bird, bird_result, confidence, sharpness, nima_score, bird_bbox, img_dims, bird_mask, bird_count)
+    保持与旧版 `ai_model.py` 相同的 9 元组返回结构，并继续支持：
+    - 多鸟场景下基于 `focus_point` 的选鸟语义
+    - `yolo_debug_path` 调试图输出
+    - 与后续 `photo_processor` 链路兼容的 bbox / img_dims / bird_mask
     """
-    # V3.1: ui_settings 仍沿用旧版顺序，避免 photo_processor 调用协议变化。
+    # ui_settings 仍沿用旧版顺序，避免调用协议变化
     ai_confidence = ui_settings[0] / 100
     save_crop = ui_settings[3]
 
     found_bird = False
     bird_result = False
-    # V3.2: NIMA 改由 photo_processor 后续链路处理，这里继续返回占位 None。
+    # NIMA 已改由 photo_processor 后续链路处理，这里继续返回占位 None
     nima_score = None
 
-    # 保持旧版入口的文件类型检查，避免非 JPG 走入后续缩放和写库流程。
+    # 保持旧版入口的文件类型检查，避免非 JPG 进入后续流程
     if not config.is_jpg_file(image_path):
         log_message("ERROR: not a jpg file", dir)
         return None
@@ -378,7 +441,7 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     total_start = time.time()
 
     try:
-        # 先复用项目现有预处理约定，保证 bbox/img_dims/bird_mask 与 photo_processor 的缩放链路兼容。
+        # 先复用项目现有预处理约定，保证后续坐标链路兼容
         image = preprocess_image(image_path)
     except Exception as exc:
         log_message(f"ERROR: preprocess failed for {image_path}: {exc}", dir)
@@ -386,7 +449,7 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     height, width, _ = image.shape
 
     try:
-        # Step 2: ONNX YOLO 推理，输出已经是 NMS 后结果，后面只做业务层筛选和坐标还原。
+        # ONNX YOLO 推理输出已是 NMS 后结果，后续只做业务筛选和坐标还原
         detections = model.predict(
             image,
             conf_thres=ai_confidence,
@@ -398,10 +461,9 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
         log_message(t("ai.ai_inference_failed", error=infer_error), dir)
         if report_db:
             report_db.insert_photo(_build_empty_result_row(image_path))
-        # V4.2: 返回 9 个值，最后一位 bird_count 保持为 0。
         return found_bird, bird_result, 0.0, 0.0, None, None, None, None, 0
 
-    # V4.2: 先收集所有鸟，再统一应用多鸟选择策略。
+    # 先收集所有鸟，再统一应用多鸟选择策略
     all_birds = []
     for idx, detection in enumerate(detections):
         if int(detection.cls) != config.ai.BIRD_CLASS_ID:
@@ -417,7 +479,8 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
 
     bird_count = len(all_birds)
     bird_idx = -1
-    # 多鸟时尽量保持旧版 ai_model 的选鸟语义：优先 focus_point 命中，否则退回最高置信度。
+
+    # 多鸟时尽量保持旧版 ai_model 的选鸟语义：优先 focus_point 命中，否则回退最高置信度
     if bird_count == 1:
         bird_idx = all_birds[0]["idx"]
     elif bird_count > 1 and focus_point is not None:
@@ -436,16 +499,15 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     if bird_idx == -1:
         if report_db:
             report_db.insert_photo(_build_empty_result_row(image_path))
-        # V3.1/V4.2: 无鸟时直接写入“no bird”记录，并保持兼容的 9 元组返回。
         return found_bird, bird_result, 0.0, 0.0, None, None, None, None, 0
 
-    # V3.2/V3.9.3: 锐度不再在此模块计算，但保留默认值，避免后续路径引用未定义变量。
+    # 锐度不再在此模块计算，但保留默认值，避免后续引用未定义变量
     sharpness = 0.0
     x, y, w, h = 0, 0, 0, 0
     bird_mask = None
 
     for idx, detection in enumerate(detections):
-        # 只处理已选中的那只鸟，保持旧版 ai_model.py 的单目标后续流程。
+        # 只处理已选中的那只鸟，保持旧版后续处理流程
         if idx != bird_idx:
             continue
 
@@ -475,7 +537,7 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
             found_bird = False
             continue
 
-        # V3.1: 仍保存红框调试图，便于人工复核检测结果。
+        # 保留红框调试图，便于人工复核检测结果
         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
         try:
@@ -488,7 +550,7 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
 
             superpicky_dir = os.path.join(dir, ".superpicky")
             cache_dir = os.path.join(superpicky_dir, "cache")
-            # V4.2: 调试目录统一命名为 yolo_debug，和当前数据库字段保持一致。
+            # 调试目录统一命名为 yolo_debug，和数据库字段保持一致
             debug_dir = os.path.join(cache_dir, "yolo_debug")
             try:
                 ensure_hidden_directory(superpicky_dir)
@@ -502,46 +564,46 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
             "filename": os.path.splitext(os.path.basename(image_path))[0],
             "has_bird": "yes" if found_bird else "no",
             "confidence": float(f"{detection.conf:.2f}"),
-            # V3.2: 这些字段改由 photo_processor 后续补齐，这里保留占位确保报表结构稳定。
+            # 这些字段改由 photo_processor 后续补齐，这里保留占位保证结果结构稳定
             "head_sharp": "-",
             "left_eye": "-",
             "right_eye": "-",
             "beak": "-",
             "nima_score": "-",
             "rating": 0,
-            # V4.1: 路径字段供结果浏览器和调试链路复用。
+            # 路径字段供结果浏览器和调试链路复用
             "current_path": rel_current_path,
             "debug_crop_path": None,
             "yolo_debug_path": None,
         }
 
         if found_bird and save_crop and output_path:
-            # V4.1: 若生成了 YOLO 调试图，优先保存相对路径，跨平台/跨磁盘时再回退绝对路径。
+            # 优先保存相对路径；跨平台/跨盘符时回退绝对路径
             try:
                 data["yolo_debug_path"] = os.path.relpath(output_path, dir)
             except ValueError:
                 data["yolo_debug_path"] = output_path
 
         if report_db:
-            # 这里沿用旧版 ai_model.py 的写库字段，让结果浏览器和后续流程无需感知后端已切到 ONNX。
+            # 写库字段与旧版 ai_model.py 保持一致，让上层无感知切换到 ONNX 后端
             report_db.insert_photo(data)
 
         if detection.mask is not None:
-            # bird_mask 返回处理后图像尺寸的二值掩码，供 photo_processor 后续再映射回原图坐标系。
+            # 返回处理后图像尺寸的二值掩码，供 photo_processor 后续再映射回原图
             raw_mask = detection.mask
             if raw_mask.shape != (height, width):
                 raw_mask = cv2.resize(raw_mask, (width, height), interpolation=cv2.INTER_NEAREST)
             bird_mask = raw_mask.astype(np.uint8)
         break
 
-    # 只有找到鸟且 output_path 有效时才落盘调试图，行为与旧版 ai_model.py 保持一致。
+    # 只有找到鸟且 output_path 有效时才落盘调试图，行为与旧版保持一致
     if found_bird and output_path:
         cv2.imwrite(output_path, image)
 
     _ = (time.time() - total_start) * 1000
 
     bird_confidence = float(detections[bird_idx].conf) if bird_idx != -1 else 0.0
-    # bbox / img_dims 继续使用“预处理后图像”的坐标系，供 photo_processor 计算回原图缩放比例。
+    # bbox / img_dims 继续使用“预处理后图像”的坐标系，便于后续缩放换算
     bird_bbox = (x, y, w, h) if found_bird else None
     img_dims = (width, height) if found_bird else None
 

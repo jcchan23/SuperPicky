@@ -330,6 +330,7 @@ def convert_yolo(
         conf=conf,
         iou=iou,
         batch=1,
+        half=True
     )
 
     exported_path = str(exported)

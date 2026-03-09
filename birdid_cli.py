@@ -57,8 +57,10 @@ def identify_single_birdid2024(args, image_path: str) -> dict:
 
 def identify_single_osea(args, image_path: str) -> dict:
     """使用 OSEA 模型识别"""
-    from birdid.osea_classifier import get_osea_classifier
-    from birdid.bird_identifier import load_image, get_yolo_detector, YOLO_AVAILABLE
+    # from birdid.osea_classifier import get_osea_classifier
+    # from birdid.bird_identifier import load_image, get_yolo_detector, YOLO_AVAILABLE
+    from birdid.osea_classifier_onnx import get_osea_classifier
+    from birdid.bird_identifier_onnx import load_image, get_yolo_detector, YOLO_AVAILABLE
 
     result = {
         'success': False,

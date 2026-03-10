@@ -403,7 +403,8 @@ def preprocess_image(image_path, target_size=None):
     if target_size is None:
         target_size = config.ai.TARGET_IMAGE_SIZE
 
-    img = cv2.imread(image_path)
+    # img = cv2.imread(image_path)
+    img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         raise FileNotFoundError(image_path)
     h, w = img.shape[:2]

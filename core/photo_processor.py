@@ -1503,7 +1503,8 @@ class PhotoProcessor:
                 if detected and bird_bbox is not None and img_dims is not None:
                     try:
                         import cv2 as _cv2_early
-                        _orig = _cv2_early.imread(filepath)
+                        # _orig = _cv2_early.imread(filepath)
+                        _orig = _cv2_early.imdecode(np.fromfile(filepath, dtype=np.uint8), _cv2_early.IMREAD_COLOR)
                         if _orig is not None:
                             _h, _w = _orig.shape[:2]
                             _sw, _sh = img_dims
@@ -1552,7 +1553,8 @@ class PhotoProcessor:
             if use_keypoints and detected and bird_bbox is not None and img_dims is not None:
                 try:
                     import cv2
-                    orig_img = cv2.imread(filepath)  # 只读取一次!
+                    # orig_img = cv2.imread(filepath)  # 只读取一次!
+                    orig_img = cv2.imdecode(np.fromfile(filepath, dtype=np.uint8), cv2.IMREAD_COLOR)
                     if orig_img is not None:
                         h_orig, w_orig = orig_img.shape[:2]
                         # 获取YOLO处理时的图像尺寸

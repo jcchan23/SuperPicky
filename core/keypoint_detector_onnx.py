@@ -357,7 +357,8 @@ def get_keypoint_detector() -> ONNXKeypointDetector:
 
 def _load_crop(path: str) -> np.ndarray:
     """从磁盘读取鸟裁剪图，并转换为 RGB。"""
-    arr = cv2.imread(path)
+    # arr = cv2.imread(path)
+    arr = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
     if arr is None:
         raise FileNotFoundError(path)
     return cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)

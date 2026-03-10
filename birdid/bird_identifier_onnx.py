@@ -448,24 +448,25 @@ def load_image(image_path: str) -> Image.Image:
         raise ImportError("rawpy is required for RAW formats")
 
     try:
-        with rawpy.imread(image_path) as raw:
-            try:
-                thumb = raw.extract_thumb()
-                if thumb.format == rawpy.ThumbFormat.JPEG:
-                    return Image.open(BytesIO(thumb.data)).convert("RGB")
-                if thumb.format == rawpy.ThumbFormat.BITMAP:
-                    return Image.fromarray(thumb.data).convert("RGB")
-            except Exception:
-                pass
+        with open(image_path, "rb") as f:
+            with rawpy.imread(f) as raw:
+                try:
+                    thumb = raw.extract_thumb()
+                    if thumb.format == rawpy.ThumbFormat.JPEG:
+                        return Image.open(BytesIO(thumb.data)).convert("RGB")
+                    if thumb.format == rawpy.ThumbFormat.BITMAP:
+                        return Image.fromarray(thumb.data).convert("RGB")
+                except Exception:
+                    pass
 
-            rgb = raw.postprocess(
-                use_camera_wb=True,
-                output_bps=8,
-                no_auto_bright=False,
-                auto_bright_thr=0.01,
-                half_size=True,
-            )
-            return Image.fromarray(rgb)
+                rgb = raw.postprocess(
+                    use_camera_wb=True,
+                    output_bps=8,
+                    no_auto_bright=False,
+                    auto_bright_thr=0.01,
+                    half_size=True,
+                )
+                return Image.fromarray(rgb)
     except rawpy._rawpy.LibRawFileUnsupportedError:
         return _load_raw_via_exiftool(image_path)
 

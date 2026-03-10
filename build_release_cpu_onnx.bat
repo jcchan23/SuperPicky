@@ -7,7 +7,6 @@ set "SPEC_FILE=SuperPicky_win64_onnx.spec"
 set "ROOT_DIR=%~dp0"
 set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "DEFAULT_OUT_DIST_DIR=dist_cpu_onnx"
-set "DEFAULT_ZIP_COPY_DIR=output\win64_cpu_onnx"
 set "BUILD_SUFFIX=_Win64_CPU_ONNX"
 cd /d "%ROOT_DIR%"
 
@@ -22,8 +21,6 @@ call :parse_args %*
 if errorlevel 1 exit /b 1
 if defined SHOW_HELP goto :show_help
 
-if "!ZIP_COPY_DIR!"=="" set "ZIP_COPY_DIR=%DEFAULT_ZIP_COPY_DIR%"
-
 goto :start
 
 :show_help
@@ -36,7 +33,7 @@ echo   version       Optional base version, for example 4.0.6
 echo                 The script always appends %BUILD_SUFFIX%
 echo                 When omitted, the base version is read from ui/about_dialog.py
 echo   zip_copy_dir  Optional copy target directory
-echo                 Default: %DEFAULT_ZIP_COPY_DIR%
+echo                 When omitted, no extra copy/output folder is created
 echo.
 exit /b 0
 
@@ -70,15 +67,12 @@ echo [========================================]
 
 set "INNO_DIR=%ROOT_DIR%\inno"
 
-if exist "%ROOT_DIR%\build_dist" rd /s /q "%ROOT_DIR%\build_dist" >nul 2>&1
-if exist "%ROOT_DIR%\build_dist_cpu" rd /s /q "%ROOT_DIR%\build_dist_cpu" >nul 2>&1
-if exist "%ROOT_DIR%\build_dist_cpu_onnx" rd /s /q "%ROOT_DIR%\build_dist_cpu_onnx" >nul 2>&1
-if exist "%ROOT_DIR%\build_dist_cuda" rd /s /q "%ROOT_DIR%\build_dist_cuda" >nul 2>&1
-if exist "%ROOT_DIR%\dist" rd /s /q "%ROOT_DIR%\dist" >nul 2>&1
-if exist "%ROOT_DIR%\dist_cpu" rd /s /q "%ROOT_DIR%\dist_cpu" >nul 2>&1
-if exist "%ROOT_DIR%\dist_cpu_onnx" rd /s /q "%ROOT_DIR%\dist_cpu_onnx" >nul 2>&1
-if exist "%ROOT_DIR%\dist_cuda" rd /s /q "%ROOT_DIR%\dist_cuda" >nul 2>&1
-if exist "%ROOT_DIR%\output" rd /s /q "%ROOT_DIR%\output" >nul 2>&1
+if exist "%ROOT_DIR%\build_!OUT_DIST_DIR!" rd /s /q "%ROOT_DIR%\build_!OUT_DIST_DIR!" >nul 2>&1
+if exist "%ROOT_DIR%\!OUT_DIST_DIR!" rd /s /q "%ROOT_DIR%\!OUT_DIST_DIR!" >nul 2>&1
+
+if defined ZIP_COPY_DIR (
+    if exist "%ZIP_COPY_DIR%" rd /s /q "%ZIP_COPY_DIR%" >nul 2>&1
+)
 
 echo [SUCCESS] Cleaned old build files
 
@@ -95,7 +89,6 @@ if not exist "%SPEC_FILE%" (
 echo [SUCCESS] Spec file found: %SPEC_FILE%
 
 if "!PYTHON_EXE!"=="" set "PYTHON_EXE=python"
-rem Prefer current env Python (for example an activated venv).
 if "!PYTHON_EXE!"=="python" (
     where python >nul 2>nul && for /f "tokens=*" %%i in ('python -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON_EXE=%%i"
 )
@@ -129,7 +122,6 @@ echo Step 1.5: Inject build metadata
 echo [========================================]
 
 set "COMMIT_HASH=unknown"
-rem Prefer Python import first so the behavior matches the project build metadata.
 for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "exec('try:\n from core.build_info_local import COMMIT_HASH\nexcept ImportError:\n from core.build_info import COMMIT_HASH\nprint(COMMIT_HASH or chr(0))')" 2^>nul') do set "COMMIT_HASH=%%i"
 if "%COMMIT_HASH%"=="" for /f "tokens=*" %%i in ('git rev-parse --short HEAD 2^>nul') do set "COMMIT_HASH=%%i"
 if "%COMMIT_HASH%"=="" set "COMMIT_HASH=unknown"
@@ -239,6 +231,7 @@ exit /b 0
 :zip_dir
 set "Z_SRC=%~1"
 set "Z_OUT=%~2"
+set "ZIP_RC=1"
 
 if not exist "%Z_SRC%" (
     echo [ERROR] Zip source not found: %Z_SRC%
@@ -249,17 +242,27 @@ if exist "%Z_OUT%" del /q "%Z_OUT%" >nul 2>&1
 
 where 7z >nul 2>&1
 if not errorlevel 1 (
-    7z a -tzip "%Z_OUT%" "%Z_SRC%" -r >nul
-    if errorlevel 1 (
-        echo [ERROR] Failed to create zip with 7z: %Z_OUT%
-        exit /b 1
+    for /l %%i in (1,1,5) do (
+        if exist "%Z_OUT%" del /q "%Z_OUT%" >nul 2>&1
+        7z a -tzip "%Z_OUT%" "%Z_SRC%" -r >nul
+        if not errorlevel 1 (
+            set "ZIP_RC=0"
+            goto :zip_done
+        )
+        echo [WARNING] 7z zip attempt %%i failed, retrying...
+        timeout /t 2 /nobreak >nul
     )
 ) else (
-    powershell -NoProfile -Command "Compress-Archive -Path '%Z_SRC%' -DestinationPath '%Z_OUT%' -Force"
-    if errorlevel 1 (
-        echo [ERROR] Failed to create zip with Compress-Archive: %Z_OUT%
-        exit /b 1
+    powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $src='%Z_SRC%'; $dst='%Z_OUT%'; for($i=1; $i -le 10; $i++){ try { if(Test-Path $dst){ Remove-Item $dst -Force -ErrorAction Stop }; Compress-Archive -Path $src -DestinationPath $dst -Force -ErrorAction Stop; exit 0 } catch { if(Test-Path $dst){ Remove-Item $dst -Force -ErrorAction SilentlyContinue }; if($i -eq 10){ Write-Error $_; exit 1 }; Write-Host ('[WARNING] Compress-Archive attempt ' + $i + ' failed, retrying...'); Start-Sleep -Seconds 2 } }"
+    if not errorlevel 1 (
+        set "ZIP_RC=0"
     )
+)
+
+:zip_done
+if not "%ZIP_RC%"=="0" (
+    echo [ERROR] Failed to create zip: %Z_OUT%
+    exit /b 1
 )
 
 echo [SUCCESS] Created zip: %Z_OUT%
@@ -358,7 +361,6 @@ echo [========================================]
 echo Step 4: Copy Inno Setup files
 echo [========================================]
 
-set "INNO_DIR=%ROOT_DIR%\inno"
 set "OUTPUT_EXE_DIR=%DIST_DIR%\%APP_NAME%"
 
 if exist "%INNO_DIR%\SuperPicky.iss" (

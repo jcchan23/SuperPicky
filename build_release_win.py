@@ -37,11 +37,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
 
-# Create console handler
+# Create console handler with UTF-8 encoding
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('[%(levelname)s] %(message)s')
 console_handler.setFormatter(formatter)
+# Set stream to use UTF-8 encoding
+if hasattr(sys.stdout, 'buffer'):
+    import codecs
+    console_handler.stream = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
 
 # Clear existing handlers and add our console handler
 if logger.handlers:

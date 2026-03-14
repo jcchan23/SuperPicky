@@ -368,9 +368,10 @@ class ResultsBrowserWindow(QMainWindow):
     def _build_toolbar(self) -> QWidget:
         """构建网格顶部工具栏（目录选择 + 缩略图尺寸滑块）。"""
         bar = QWidget()
+        bar.setObjectName("toolbar")
         bar.setFixedHeight(52)
         bar.setStyleSheet(f"""
-            QWidget {{
+            QWidget#toolbar {{
                 background-color: {COLORS['bg_elevated']};
                 border-bottom: 1px solid {COLORS['border_subtle']};
             }}
@@ -906,9 +907,10 @@ class ResultsBrowserWidget(QWidget):
 
     def _build_toolbar(self) -> QWidget:
         bar = QWidget()
+        bar.setObjectName("toolbar")
         bar.setFixedHeight(52)
         bar.setStyleSheet(f"""
-            QWidget {{
+            QWidget#toolbar {{
                 background-color: {COLORS['bg_elevated']};
                 border-bottom: 1px solid {COLORS['border_subtle']};
             }}

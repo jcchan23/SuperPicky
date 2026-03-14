@@ -3,6 +3,7 @@
 [![Version](https://img.shields.io/badge/version-4.1.0-blue.svg)](https://github.com/jamesphotography/SuperPicky)
 [![Platform](https://img.shields.io/badge/platform-macOS%20|%20Windows-lightgrey.svg)](https://github.com/jamesphotography/SuperPicky/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Build](https://github.com/jamesphotography/SuperPicky/actions/workflows/build-release.yml/badge.svg)](https://github.com/jamesphotography/SuperPicky/actions/workflows/build-release.yml)
 
 [**中文文档 (Chinese)**](README_zh.md) | [**Release Notes**](RELEASE_NOTES.md)
 
@@ -29,8 +30,8 @@ python scripts/download_models.py
 
 ### 🤖 Multi-Model Synergy
 - **YOLO11 Detection**: Precise bird detection and segmentation masks.
-- **SuperEyes**: Detects eye visibility and calculates head sharpness.
-- **SuperFlier**: Identifies flight poses for bonus points.
+- **[SuperEyes](https://github.com/triple333sR9/SuperBirdEye)**: Detects eye visibility and calculates head sharpness.
+- **[SuperFlier](https://github.com/triple333sR9/SuperFlier)**: Identifies flight poses for bonus points.
 - **TOPIQ Aesthetics**: Assesses overall image aesthetics, composition, and lighting.
 
 ### ⭐ Smart Rating System (0-3 Stars)
@@ -64,15 +65,15 @@ Automatically set thresholds based on your experience:
 
 ### macOS
 **Apple Silicon (M1/M2/M3/M4) (v4.1.0 LTS)**
-- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_arm64_8e61afbd.dmg)
-- [Google Drive (Mirror)](https://drive.google.com/file/d/1dVjJxAJahvxbsgp5z7QX-zgEyz7Q-boB/view?usp=sharing)
-- [Baidu Netdisk](https://pan.baidu.com/s/1QSV7hkvuC65FTEUyF89z6Q?pwd=5t7s) Code: 5t7s
+- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_arm64_c869d64.dmg)
+- [Google Drive (Mirror)](https://drive.google.com/file/d/1odYNFvtYZa8pAO_bYZZCh5FZ6v0ggxFQ)
+- [Baidu Netdisk](https://pan.baidu.com/s/1xzex0UrSDiZeWyLuYRSqNg?pwd=t6c4) Code: t6c4
 - [Quark](https://pan.quark.cn/s/625a2dac438a)
 
 **Intel (Pre-2020 Mac) (v4.1.0 LTS)**
-- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_Intel_8e61afb.dmg)
-- [Google Drive (Mirror)](https://drive.google.com/file/d/1rSdEcbZcpxtqhF8k064Av5vFXowCpVTz/view?usp=sharing)
-- [Baidu Netdisk](https://pan.baidu.com/s/1WUsxHypexvaBwOGzkRhxoA?pwd=c3m9) Code: c3m9
+- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_Intel_c869d64.dmg)
+- [Google Drive (Mirror)](https://drive.google.com/file/d/1dPdCoObVLuxy9ks_sYjbfSR4bI3A-IPD)
+- [Baidu Netdisk](https://pan.baidu.com/s/1lNz2mBUEee8qqrd95rPJsA?pwd=3821) Code: 3821
 - [Quark](https://pan.quark.cn/s/1b5d87b74059)
 
 ### Windows
@@ -82,9 +83,9 @@ Automatically set thresholds based on your experience:
 - [Quark](https://pan.quark.cn/s/d15276717367)
 
 **CPU Version (v4.1.0 LTS)**
-- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_Win64_CPU_4.1.0-44e7981.zip)
-- [Baidu Netdisk](https://pan.baidu.com/s/1Qlm0W1fWAnZAqRevhThgWg?pwd=4fis) Code: 4fis
-- [Google Drive (Mirror)](https://drive.google.com/file/d/1_G5R-Oe6QgsQ687G07b1Il6yWKDLn5IU/view?usp=sharing)
+- [GitHub Download](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_Setup_Win64_4.1.0_242f4be.exe)
+- [Baidu Netdisk](https://pan.baidu.com/s/1dle-dGbKx5_On5cfdaaLXQ?pwd=872v) Code: 872v
+- [Google Drive (Mirror)](https://drive.google.com/file/d/1nTcgQdUqotu04kVkWUZqENnQtn573uzx)
 - [Quark](https://pan.quark.cn/s/1b7016c16f79)
 
 
@@ -135,10 +136,12 @@ Review unmatched species in the report output and add manual overrides to `scrip
 
 ## 📄 License
 
-Open sourced under **GPL-3.0 License**.
+Open sourced under **GNU AFFERO GENERAL PUBLIC LICENSE Version 3**.
 
 This project uses:
 - **YOLO11** by Ultralytics
 - **OSEA** by Sun Jiao (github.com/sun-jiao/osea)
+- **[SuperEyes (SuperBirdEye)](https://github.com/triple333sR9/SuperBirdEye)** by [Jordan Yu (于若君)](https://github.com/triple333sR9)
+- **[SuperFlier](https://github.com/triple333sR9/SuperFlier)** by [Jordan Yu (于若君)](https://github.com/triple333sR9)
 - **TOPIQ** by Chaofeng Chen et al.
 - **AviList**: AviList Core Team. 2025. AviList: The Global Avian Checklist, v2025. https://doi.org/10.2173/avilist.v2025 — Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

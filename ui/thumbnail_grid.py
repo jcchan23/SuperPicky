@@ -470,11 +470,12 @@ class ThumbnailGrid(QScrollArea):
         self._last_clicked_idx = -1
         self._anchor_photo = None
 
-        # 清空旧卡片
+        # 清空旧卡片（保留 _loading_label 避免被 deleteLater 销毁）
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget()
+            if w and w is not self._loading_label:
+                w.deleteLater()
 
         if not photos:
             self._photos = []

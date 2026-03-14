@@ -11,15 +11,34 @@ import sys
 import subprocess
 
 
-def get_git_commit_hash():
+def get_commit_hash():
     """
-    Get current Git commit hash
+    从 Python 代码读取 COMMIT_HASH（保证跨平台一致）
+    优先读 build_info_local.py，其次 build_info.py，最后 fallback 到 git
     
     Returns:
-        str: 7-character Git commit hash
+        str: commit hash
     """
+    # 优先从 Python 代码读取（保证跨平台一致）
     try:
-        # Execute git command to get current commit hash
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.insert(0, base_dir)
+        try:
+            from core.build_info_local import COMMIT_HASH
+            if COMMIT_HASH:
+                print(f"Using COMMIT_HASH from build_info_local.py: {COMMIT_HASH}")
+                return COMMIT_HASH
+        except ImportError:
+            pass
+        from core.build_info import COMMIT_HASH as default_hash
+        if default_hash:
+            print(f"Using COMMIT_HASH from build_info.py: {default_hash}")
+            return default_hash
+    except Exception as e:
+        print(f"Warning: could not read from build_info: {e}")
+    
+    # Fallback: git
+    try:
         result = subprocess.run(
             ['git', 'rev-parse', '--short=7', 'HEAD'],
             capture_output=True,
@@ -28,12 +47,9 @@ def get_git_commit_hash():
         )
         if result.returncode == 0:
             return result.stdout.strip()
-        else:
-            print(f"Failed to get Git commit hash: {result.stderr}")
-            return "unknown"
-    except Exception as e:
-        print(f"Error getting Git commit hash: {e}")
-        return "unknown"
+    except Exception:
+        pass
+    return "unknown"
 
 
 def read_app_version():
@@ -73,40 +89,55 @@ def update_inno_version():
     """
     # Get version and hash
     app_version = read_app_version()
-    commit_hash = get_git_commit_hash()
+    commit_hash = get_commit_hash()
     
     # Combine version string
     new_version = f"{app_version}-{commit_hash}"
     print(f"Updating version to: {new_version}")
     
-    # Locate inno file
-    inno_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'inno', 'SuperPicky.iss'
-    )
+    # Locate inno files
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    inno_paths = [
+        os.path.join(base_dir, 'inno', 'SuperPicky.iss'),
+        os.path.join(base_dir, 'output', 'SuperPicky_Win64_CPU', 'SuperPicky.iss')
+    ]
     
-    try:
-        # Read file content
-        with open(inno_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Replace AppVersion
-        import re
-        updated_content = re.sub(
-            r'AppVersion=.+',
-            f'AppVersion={new_version}',
-            content
-        )
-        
-        # Write back to file
-        with open(inno_path, 'w', encoding='utf-8') as f:
-            f.write(updated_content)
-        
-        print(f"Successfully updated {inno_path}")
-        return True
-    except Exception as e:
-        print(f"Error updating inno file: {e}")
-        return False
+    success = True
+    for inno_path in inno_paths:
+        if not os.path.exists(inno_path):
+            print(f"Skipping {inno_path} - file not found")
+            continue
+            
+        try:
+            # Read file content
+            with open(inno_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Replace AppVersion
+            import re
+            updated_content = re.sub(
+                r'AppVersion=.+',
+                f'AppVersion={new_version}',
+                content
+            )
+            
+            # Replace OutputBaseFilename
+            updated_content = re.sub(
+                r'OutputBaseFilename=SuperPicky_Setup_Win64',
+                f'OutputBaseFilename=SuperPicky_Setup_Win64_{app_version}_{commit_hash}',
+                updated_content
+            )
+            
+            # Write back to file
+            with open(inno_path, 'w', encoding='utf-8') as f:
+                f.write(updated_content)
+            
+            print(f"Successfully updated {inno_path}")
+        except Exception as e:
+            print(f"Error updating {inno_path}: {e}")
+            success = False
+    
+    return success
 
 
 if __name__ == "__main__":

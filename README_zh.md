@@ -16,8 +16,8 @@
 
 ### 🤖 多模型协作
 - **YOLO11 检测**: 精准识别照片中的鸟类位置和分割掩码
-- **SuperEyes 鸟眼**: 检测鸟眼位置和可见度，计算头部区域锐度
-- **SuperFlier 飞鸟**: 识别飞行姿态，给予飞版照片额外加分
+- **[SuperEyes 鸟眼](https://github.com/triple333sR9/SuperBirdEye)**: 检测鸟眼位置和可见度，计算头部区域锐度
+- **[SuperFlier 飞鸟](https://github.com/triple333sR9/SuperFlier)**: 识别飞行姿态，给予飞版照片额外加分
 - **TOPIQ 美学**: 评估整体画面美感、构图和光影
 
 ### ⭐ 智能评分系统 (0-3星)
@@ -59,10 +59,10 @@
 
 ### macOS
 **Apple Silicon (M1/M2/M3/M4) (v4.1.0 LTS)**
-- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_arm64_8e61afbd.dmg) | [Google Drive](https://drive.google.com/file/d/1dVjJxAJahvxbsgp5z7QX-zgEyz7Q-boB/view?usp=sharing) | [百度网盘](https://pan.baidu.com/s/1QSV7hkvuC65FTEUyF89z6Q?pwd=5t7s) 提取码: 5t7s | [夸克网盘](https://pan.quark.cn/s/625a2dac438a)
+- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_arm64_c869d64.dmg) | [Google Drive](https://drive.google.com/file/d/1odYNFvtYZa8pAO_bYZZCh5FZ6v0ggxFQ) | [百度网盘](https://pan.baidu.com/s/1xzex0UrSDiZeWyLuYRSqNg?pwd=t6c4) 提取码: t6c4 | [夸克网盘](https://pan.quark.cn/s/625a2dac438a)
 
 **Intel (2020年前 Mac) (v4.1.0 LTS)**
-- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_Intel_8e61afb.dmg) | [Google Drive](https://drive.google.com/file/d/1rSdEcbZcpxtqhF8k064Av5vFXowCpVTz/view?usp=sharing) | [百度网盘](https://pan.baidu.com/s/1WUsxHypexvaBwOGzkRhxoA?pwd=c3m9) 提取码: c3m9 | [夸克网盘](https://pan.quark.cn/s/1b5d87b74059)
+- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_v4.1.0_Intel_c869d64.dmg) | [Google Drive](https://drive.google.com/file/d/1dPdCoObVLuxy9ks_sYjbfSR4bI3A-IPD) | [百度网盘](https://pan.baidu.com/s/1lNz2mBUEee8qqrd95rPJsA?pwd=3821) 提取码: 3821 | [夸克网盘](https://pan.quark.cn/s/1b5d87b74059)
 
 1. 下载对应版本的 DMG 文件
 2. 双击 DMG 文件，将应用拖入 Applications
@@ -73,7 +73,7 @@
 - [百度网盘](https://pan.baidu.com/s/1XBaGXPim_WzjpNBgG-altg?pwd=c2a6) 提取码: c2a6 | [Google Drive](https://drive.google.com/file/d/1IKSxB3KbQdDO7VhnsGnHjOb2EgqZIgSB/view?usp=sharing) | [夸克网盘](https://pan.quark.cn/s/d15276717367)
 
 **CPU Version (v4.1.0 LTS)**
-- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_Win64_CPU_4.1.0-44e7981.zip) | [百度网盘](https://pan.baidu.com/s/1Qlm0W1fWAnZAqRevhThgWg?pwd=4fis) 提取码: 4fis | [Google Drive](https://drive.google.com/file/d/1_G5R-Oe6QgsQ687G07b1Il6yWKDLn5IU/view?usp=sharing) | [夸克网盘](https://pan.quark.cn/s/1b7016c16f79)
+- [GitHub 下载](https://github.com/jamesphotography/SuperPicky/releases/download/v4.1.0/SuperPicky_Setup_Win64_4.1.0_242f4be.exe) | [百度网盘](https://pan.baidu.com/s/1dle-dGbKx5_On5cfdaaLXQ?pwd=872v) 提取码: 872v | [Google Drive](https://drive.google.com/file/d/1nTcgQdUqotu04kVkWUZqENnQtn573uzx) | [夸克网盘](https://pan.quark.cn/s/1b7016c16f79)
 
 
 1. 下载并解压 ZIP 文件
@@ -156,8 +156,8 @@ python main.py
 | 角色 | 成员 | 贡献 |
 |------|------|------|
 | 开发者 | [James Yu (詹姆斯·于震)](https://github.com/jamesphotography) | 核心开发 |
-| 模型训练 | [Jordan Yu (于若君)](https://github.com/jordan-yrj) | SuperEyes · SuperFlier |
-| Windows版 | [小平](https://github.com/thp2024) | Windows移植 |
+| 模型训练 | [Jordan Yu (于若君)](https://github.com/triple333sR9) | SuperEyes · SuperFlier |
+| Windows版 | [小平](https://github.com/thp2024) · [伯劳](https://github.com/yblpoi) | Windows移植 |
 
 ---
 
@@ -165,6 +165,8 @@ python main.py
 
 - [YOLO11](https://github.com/ultralytics/ultralytics) - Ultralytics 目标检测模型
 - [TOPIQ](https://github.com/chaofengc/IQA-PyTorch) - Chaofeng Chen 等人的图像质量评估模型
+- [SuperEyes (SuperBirdEye)](https://github.com/triple333sR9/SuperBirdEye) - [Jordan Yu (于若君)](https://github.com/triple333sR9) 鸟眼识别模型
+- [SuperFlier](https://github.com/triple333sR9/SuperFlier) - [Jordan Yu (于若君)](https://github.com/triple333sR9) 飞版检测模型
 - [ExifTool](https://exiftool.org/) - Phil Harvey 的 EXIF 处理工具
 
 ---

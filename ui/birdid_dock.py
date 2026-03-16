@@ -61,6 +61,7 @@ class IdentifyWorker(QThread):
 
     def run(self):
         try:
+            # from birdid.bird_identifier import identify_bird
             from birdid.bird_identifier_onnx import identify_bird
             result = identify_bird(
                 self.image_path,
@@ -1413,6 +1414,7 @@ class BirdIDDockWidget(QDockWidget):
             raw_extensions = ['.nef', '.cr2', '.cr3', '.arw', '.raf', '.orf', '.rw2', '.dng']
 
             if ext in raw_extensions:
+                # from birdid.bird_identifier import load_image
                 from birdid.bird_identifier_onnx import load_image
                 pil_image = load_image(file_path)
                 import tempfile

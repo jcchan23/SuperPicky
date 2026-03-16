@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import dataclass
 from typing import List, Dict
-
+# import torch
 
 
 def resource_path(relative_path):
@@ -55,7 +55,7 @@ class DirectoryConfig:
 @dataclass
 class AIConfig:
     """AI 模型相关配置"""
-    MODEL_FILE: str = "models/yolo11l-seg.onnx"  # ONNX 版本: yolo11l-seg 分割模型
+    MODEL_FILE: str = "models/yolo11l-seg.onnx"  # 使用 yolo11l-seg 分割模型（已打包）
     BIRD_CLASS_ID: int = 14              # YOLO 模型中鸟类的类别 ID
     TARGET_IMAGE_SIZE: int = 1024        # 图像预处理目标尺寸（保持1024以维持锐度值一致性）
     CENTER_THRESHOLD: float = 0.15       # 鸟类位置中心阈值
@@ -138,31 +138,37 @@ class Config:
 
 def get_best_device():
     """
-    获取最佳计算设备（ONNX 版本）
-    返回一个带 .type 属性的对象，兼容原有 get_best_device().type 调用
-    ONNX Runtime 通过 provider 选择设备，此函数仅用于日志和兼容
+    获取最佳计算设备
+    遵循用户期望的逻辑：
+    1. 先检测平台，MAC就用mps
+    2. Windows就先验证是否支持CUDA
+    3. 如果支持就使用CUDA
+    4. 如果不支持就用CPU
     """
-    import platform
-    from types import SimpleNamespace
-    
     try:
-        system = platform.system()
-        if system == "Darwin":
-            # macOS: ONNX Runtime 默认走 CPU（CoreML 需额外配置）
-            return SimpleNamespace(type="cpu")
+        # # 检查 MPS (Apple GPU)
+        # if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        #     return torch.device("mps")
         
-        # Windows/Linux: 检查 CUDA 是否可用
-        try:
-            import onnxruntime as ort
-            providers = ort.get_available_providers()
-            if 'CUDAExecutionProvider' in providers:
-                return SimpleNamespace(type="cuda")
-        except Exception:
-            pass
+        # # 检查 CUDA (NVIDIA GPU)
+        # if torch.cuda.is_available():
+        #     return torch.device("cuda")
         
-        return SimpleNamespace(type="cpu")
+        # # 默认使用 CPU
+        # return torch.device("cpu")
+
+        import onnxruntime as ort
+        availble_providers = ort.get_available_providers()
+
+        if "CUDAExecutionProvider" in availble_providers:
+            return "cuda"
+        else:
+            return "cpu"
+
     except Exception:
-        return SimpleNamespace(type="cpu")
+        # 如果 torch 导入失败或其他异常，回退到 CPU
+        # return torch.device("cpu")
+        return "cpu"
 
 
 # 全局配置实例

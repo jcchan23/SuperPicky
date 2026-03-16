@@ -21,6 +21,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from PIL import Image
 
+# from birdid.bird_identifier import (
+#     identify_bird,
+#     predict_bird,
+#     load_image,
+#     extract_gps_from_exif,
+#     get_classifier,
+#     get_database_manager,
+#     get_yolo_detector,
+#     YOLO_AVAILABLE
+# )
+
 from birdid.bird_identifier_onnx import (
     identify_bird,
     predict_bird,
@@ -31,6 +42,7 @@ from birdid.bird_identifier_onnx import (
     get_yolo_detector,
     YOLO_AVAILABLE
 )
+
 
 # 创建 Flask 应用
 app = Flask(__name__)

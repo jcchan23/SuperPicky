@@ -357,15 +357,9 @@ def load_yolo_model(log_callback=None):
     """
     global _MODEL_INSTANCE
     model_path = config.ai.get_model_path()
-    # GUI 启动时工作目录可能不是项目目录，resource_path 会解析错误
-    # 用 __file__ 作为 fallback
-    if not os.path.exists(model_path):
-        fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), config.ai.MODEL_FILE)
-        if os.path.exists(fallback):
-            model_path = fallback
     try:
         from config import get_best_device
-        preferred_device = get_best_device().type
+        preferred_device = get_best_device()
     except Exception:
         preferred_device = "cpu"
 
@@ -382,7 +376,7 @@ def load_yolo_model(log_callback=None):
         elif provider == "CoreMLExecutionProvider":
             msg = i18n.t("ai.using_mps")
         else:
-            msg = i18n.t("ai.using_cpu_onnx")
+            msg = i18n.t("ai.using_cpu")
 
         if log_callback:
             log_callback(msg, "info")

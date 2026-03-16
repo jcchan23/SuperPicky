@@ -938,6 +938,11 @@ class SuperPickyMainWindow(QMainWindow):
         无论通过 X按鈕 / Cmd+Q / 托盘退出，都会经过此处。
         Mac 和 Windows 均适用。
         """
+        if hasattr(self, '_results_browser') and self._results_browser:
+            try:
+                self._results_browser.cleanup()
+            except Exception as e:
+                print(f"⚠️  Results browser cleanup failed: {e}")
         self._stop_birdid_server()        # 停止 Flask/BirdID 进程
         
         # 清理 ExifTool 进程
@@ -2535,24 +2540,24 @@ class SuperPickyMainWindow(QMainWindow):
                 self.log_signal.emit(self.i18n.t("preload.preloading_models"), "info")
                 
                 # 1. YOLO 检测模型 - 使用GUI日志回调
-                from ai_model_onnx import load_yolo_model
+                from ai_model import load_yolo_model
                 load_yolo_model(log_callback=lambda msg, tag="info": self.log_signal.emit(msg, tag))
                 self.log_signal.emit(self.i18n.t("preload.yolo_loaded"), "success")
                 
                 # 2. 关键点检测模型
-                from core.keypoint_detector_onnx import get_keypoint_detector
+                from core.keypoint_detector import get_keypoint_detector
                 kp_detector = get_keypoint_detector()
                 kp_detector.load_model()
                 self.log_signal.emit(self.i18n.t("preload.keypoint_loaded"), "success")
                 
                 # 3. 飞版检测模型
-                from core.flight_detector_onnx import get_flight_detector
+                from core.flight_detector import get_flight_detector
                 flight_detector = get_flight_detector()
                 flight_detector.load_model()
                 self.log_signal.emit(self.i18n.t("preload.flight_loaded"), "success")
                 
                 # 4. 识鸟模型
-                from birdid.bird_identifier_onnx import get_classifier
+                from birdid.bird_identifier import get_classifier
                 get_classifier()
                 self.log_signal.emit(self.i18n.t("preload.birdid_loaded"), "success")
                 

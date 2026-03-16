@@ -41,6 +41,8 @@ class ExifToolManager:
         self._stdout_queue = None
         self._reader_thread = None
         self._lock = threading.Lock()
+        self._shutdown_lock = threading.Lock()
+        self._is_shutdown = False
         
         # 注册退出清理
         atexit.register(self.shutdown)
@@ -271,13 +273,24 @@ class ExifToolManager:
     
     def shutdown(self):
         """关闭ExifTool管理器，停止所有相关进程"""
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 🔄 ExifToolManager shutting down...")
-        self._stop_process()
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ✅ ExifToolManager shutdown completed")
-    
+        global exiftool_manager
+        with self._shutdown_lock:
+            if self._is_shutdown:
+                return
+            self._is_shutdown = True
+
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 🔄 ExifToolManager shutting down...")
+            self._stop_process()
+            if exiftool_manager is self:
+                exiftool_manager = None
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ✅ ExifToolManager shutdown completed")
+
     def __del__(self):
         """析构函数，确保进程被关闭"""
-        self.shutdown()
+        try:
+            self.shutdown()
+        except Exception:
+            pass
 
     def _read_until_ready(self, timeout=10.0) -> bytes:
         """从队列读取直到 {ready}，支持超时"""

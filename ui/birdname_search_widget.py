@@ -26,21 +26,29 @@ from tools.i18n import get_i18n
 def get_birdname_db_path() -> str:
     """获取鸟类名称数据库路径"""
     if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
+        # macOS .app bundle struct: executable is in Contents/MacOS/
+        # PyInstaller puts datas in Contents/Resources/
+        if sys.platform == 'darwin':
+            app_contents = os.path.dirname(os.path.dirname(sys.executable))
+            res_dir = os.path.join(app_contents, 'Resources')
+            path_in_res = os.path.join(res_dir, 'ioc', 'birdname.db')
+            if os.path.exists(path_in_res):
+                return path_in_res
+        
+        # Windows 或 one-dir / one-file 模式的回退
+        return os.path.join(sys._MEIPASS, 'ioc', 'birdname.db')
     else:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_dir, 'ioc', 'birdname.db')
+        return os.path.join(base_dir, 'ioc', 'birdname.db')
 
 
 def get_birdname_ini_path() -> str:
-    """获取 ioc 目录下的 ini 配置文件路径"""
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ioc_dir = os.path.join(base_dir, 'ioc')
-    os.makedirs(ioc_dir, exist_ok=True)
-    return os.path.join(ioc_dir, 'birdname_settings.ini')
+    """获取 ioc 目录下的 ini 配置文件路径（用户设置，保留在用户可写目录）"""
+    # 将持久化配置存储在用户的主目录 .superpicky/ 下，避免 macOS App 内沙盒只读权限问题
+    user_home = os.path.expanduser('~')
+    app_data_dir = os.path.join(user_home, '.superpicky', 'ioc')
+    os.makedirs(app_data_dir, exist_ok=True)
+    return os.path.join(app_data_dir, 'birdname_settings.ini')
 
 
 def load_last_version() -> Optional[str]:
@@ -185,30 +193,22 @@ class BirdNameSearchWidget(QWidget):
                 color: {COLORS['text_primary']};
                 font-size: 10px;
             }}
-            QComboBox:hover {{ border-color: {COLORS['accent']}; }}
+            QComboBox:hover {{ border-color: {COLORS['text_muted']}; }}
             QComboBox:focus {{ border-color: {COLORS['accent']}; outline: none; }}
             QComboBox::drop-down {{ border: none; width: 18px; }}
-            QComboBox::down-arrow {{
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid {COLORS['text_tertiary']};
-                margin-right: 6px;
-            }}
             QComboBox QAbstractItemView {{
                 background-color: {COLORS['bg_elevated']};
                 border: 1px solid {COLORS['border']};
                 border-radius: 4px;
-                selection-background-color: {COLORS['accent']};
+                selection-background-color: {COLORS['accent_dim']};
                 selection-color: {COLORS['text_primary']};
+                outline: none;
                 padding: 2px;
             }}
             QComboBox QAbstractItemView::item {{
                 padding: 4px 8px;
                 color: {COLORS['text_primary']};
-            }}
-            QComboBox QAbstractItemView::item:hover {{
-                background-color: {COLORS['bg_card']};
+                min-height: 24px;
             }}
         """)
         self.version_combo.currentIndexChanged.connect(self._on_version_changed)

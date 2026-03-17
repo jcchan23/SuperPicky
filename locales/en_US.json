@@ -2,7 +2,7 @@
   "_meta": {
     "language_name": "English",
     "language_code": "en_US",
-    "version": "4.2.0"
+    "version": "4.2.1-beta"
   },
   "app": {
     "title": "SuperPicky - AI Bird Photo Culling Tool v{version} ({hash})",

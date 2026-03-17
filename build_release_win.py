@@ -20,7 +20,6 @@ import re
 import shutil
 import subprocess
 import sys
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -101,7 +100,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--version", help="覆盖基础版本号，例如 4.2.0")
     parser.add_argument("--copy-dir", help="复制最终产物的目标目录")
-    parser.add_argument("--no-zip", action="store_true", help="跳过创建 ZIP")
+    parser.add_argument("--no-zip", action="store_true", help="跳过创建便携压缩包")
     parser.add_argument("--debug", action="store_true", help="输出调试日志")
     return parser.parse_args()
 
@@ -377,16 +376,45 @@ def build_bundle(python_exe: Path, build_paths: BuildPaths) -> None:
     logger.info("[成功] %s 构建完成", build_paths.label.upper())
 
 
-def create_zip_archive(source_dir: Path, zip_path: Path) -> None:
-    zip_path.parent.mkdir(parents=True, exist_ok=True)
-    zip_path.unlink(missing_ok=True)
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for file_path in sorted(source_dir.rglob("*")):
-            if file_path.is_file():
-                archive.write(file_path, file_path.relative_to(source_dir.parent))
+def find_7z_executable() -> str:
+    candidates = [
+        shutil.which("7z"),
+        shutil.which("7zz"),
+        shutil.which("7za"),
+        str(Path("C:/Program Files/7-Zip/7z.exe")),
+        str(Path("C:/Program Files (x86)/7-Zip/7z.exe")),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if Path(candidate).exists():
+            return candidate
+    raise FileNotFoundError("未找到 7z 可执行文件，请先安装 7-Zip 或确保 7z/7zz/7za 已加入 PATH")
 
 
-def zip_name_for(label: str, app_version: str, commit_hash: str) -> str:
+def create_zip_archive(source_dir: Path, archive_path: Path) -> None:
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    archive_path.unlink(missing_ok=True)
+    seven_zip = find_7z_executable()
+    run_command(
+        [
+            seven_zip,
+            "a",
+            "-tzip",
+            "-mx=9",
+            "-mm=LZMA",
+            "-md=256m",
+            "-mfb=128",
+            "-mmt=on",
+            str(archive_path),
+            source_dir.name,
+        ],
+        cwd=source_dir.parent,
+        label="ZIP 压缩",
+    )
+
+
+def archive_name_for(label: str, app_version: str, commit_hash: str) -> str:
     return f"{APP_NAME}_Win64_{app_version}_{commit_hash}_{label}.zip"
 
 
@@ -453,12 +481,12 @@ def publish_standard_build(
     installer_script_path = prepare_standard_installer_staging(zip_source_dir, artifact_root, config, label=label)
 
     if not config.no_zip:
-        zip_path = artifact_root / zip_name_for(label, config.app_version, config.commit_hash)
+        zip_path = artifact_root / archive_name_for(label, config.app_version, config.commit_hash)
         create_zip_archive(zip_source_dir, zip_path)
-        logger.info("[成功] 已创建 ZIP: %s", zip_path)
+        logger.info("[成功] 已创建 ZIP 压缩包: %s", zip_path)
     else:
         zip_path = None
-        logger.info("[信息] 跳过 ZIP 创建 (--no-zip)")
+        logger.info("[信息] 跳过 ZIP 压缩包创建 (--no-zip)")
 
     logger.info("[成功] 已准备目录: %s", final_bundle_dir)
     return final_bundle_dir, zip_path, installer_script_path
@@ -604,16 +632,16 @@ def run_cuda_patch_build(config: BuildConfig) -> None:
     patch_dir = prepare_patch_directory(cpu_paths.bundle_dir, cuda_paths.bundle_dir, config)
     patch_installer_script = prepare_patch_installer_staging(patch_dir, config)
     if not config.no_zip:
-        patch_zip = (config.copy_dir or DEFAULT_PATCH_OUTPUT_ROOT) / zip_name_for(
+        patch_zip = (config.copy_dir or DEFAULT_PATCH_OUTPUT_ROOT) / archive_name_for(
             "cuda_patch",
             config.app_version,
             config.commit_hash,
         )
         create_zip_archive(patch_dir, patch_zip)
-        logger.info("[成功] 已创建 CUDA 补丁 ZIP: %s", patch_zip)
+        logger.info("[成功] 已创建 CUDA 补丁 ZIP 压缩包: %s", patch_zip)
     else:
         patch_zip = None
-        logger.info("[信息] 跳过 CUDA 补丁 ZIP 创建 (--no-zip)")
+        logger.info("[信息] 跳过 CUDA 补丁 ZIP 压缩包创建 (--no-zip)")
 
     log_step("步骤 7: 清理 CUDA 中间产物")
     remove_path(cuda_paths.work_dir)

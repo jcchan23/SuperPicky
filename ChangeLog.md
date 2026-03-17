@@ -1,8 +1,8 @@
-# SuperPicky Nightly / Unreleased ChangeLog
+# SuperPicky Nightly / v4.2.1-beta
 
-**整理范围**: `from tag 4.2.0 to nightly HEAD`  
-**当前分支基线**: `nightly`  
-**当前提交**: `d3eeca7e`  
+**整理范围**: `from tag 4.2.0 to nightly HEAD`
+**当前分支基线**: `nightly`
+**当前提交**: `d3eeca7e`
 **整理日期**: `2026-03-17`
 
 ---

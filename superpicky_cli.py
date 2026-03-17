@@ -46,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def print_banner():
     """打印 CLI 横幅"""
     print("\n" + "━" * 60)
-    print(t("cli.banner", version="4.2.0"))
+    print(t("cli.banner", version="4.2.1"))
     print("━" * 60)
 
 

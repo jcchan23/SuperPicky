@@ -754,6 +754,7 @@ class PhotoProcessor:
         exiftool_mgr = get_exiftool_manager()
         
         for group_id, original_filepaths in groups.items():
+            db_updates = {}
             # 找到每个文件当前的实际位置和星级
             current_files = []
             for orig_path in original_filepaths:
@@ -865,25 +866,39 @@ class PhotoProcessor:
                         shutil.move(f['path'], dest)
                         stats['moved'] += 1
 
-                        # V4.1.1: 同步更新 DB 中的 current_path，避免路径与实际位置不符
-                        if hasattr(self, 'report_db') and self.report_db:
-                            try:
-                                rel_dest = os.path.relpath(dest, self.dir_path)
-                                self.report_db.update_photo(f['prefix'], {'current_path': rel_dest})
-                            except Exception as db_e:
-                                self._log(f"    ⚠️ DB current_path update failed: {db_e}", "warning")
+                    # V4.2.x: 无论本次是否实际 move，只要 burst 目录中的目标文件存在，
+                    # 都以最终落点为准回写数据库路径，避免 current_path/temp_jpeg_path 残留旧目录。
+                    if os.path.exists(dest):
+                        rel_dest = os.path.relpath(dest, self.dir_path)
+                        update_data = db_updates.setdefault(f['prefix'], {})
+                        update_data['current_path'] = rel_dest
+                        if os.path.splitext(filename)[1].lower() in ('.jpg', '.jpeg'):
+                            update_data['temp_jpeg_path'] = rel_dest
 
-                        # 移动 sidecar 文件
-                        file_base = os.path.splitext(f['path'])[0]
-                        for sidecar_ext in ['.xmp', '.jpg', '.JPG']:
-                            sidecar = file_base + sidecar_ext
-                            if os.path.exists(sidecar):
-                                try:
-                                    shutil.move(sidecar, os.path.join(burst_dir, os.path.basename(sidecar)))
-                                except:
-                                    pass
+                    # 移动 sidecar 文件
+                    file_base = os.path.splitext(f['path'])[0]
+                    for sidecar_ext in ['.xmp', '.jpg', '.jpeg', '.JPG', '.JPEG']:
+                        sidecar = file_base + sidecar_ext
+                        sidecar_dest = os.path.join(burst_dir, os.path.basename(sidecar))
+                        if os.path.exists(sidecar) and not os.path.exists(sidecar_dest):
+                            try:
+                                shutil.move(sidecar, sidecar_dest)
+                            except Exception:
+                                pass
+                        if os.path.exists(sidecar_dest) and sidecar_ext.lower() in ('.jpg', '.jpeg'):
+                            rel_sidecar_dest = os.path.relpath(sidecar_dest, self.dir_path)
+                            db_updates.setdefault(f['prefix'], {})['temp_jpeg_path'] = rel_sidecar_dest
                 except Exception as e:
                     self._log(f"    ⚠️ Move failed: {e}", "warning")
+
+            if hasattr(self, 'report_db') and self.report_db:
+                for prefix, update_data in db_updates.items():
+                    if not update_data:
+                        continue
+                    try:
+                        self.report_db.update_photo(prefix, update_data)
+                    except Exception as db_e:
+                        self._log(f"    ⚠️ DB burst path update failed for {prefix}: {db_e}", "warning")
 
             
             stats['groups'] += 1

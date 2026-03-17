@@ -1048,6 +1048,8 @@
     "rate_left_tooltip": "Rate Left Photo {i}★ (Keyboard {i})",
     "rate_right_tooltip": "Rate Right Photo {i}★ (Keyboard {key})",
     "ctx_show_in_finder": "Show in Finder",
+    "ctx_show_in_explorer": "Show in Explorer",
+    "ctx_show_in_file_manager": "Show in File Manager",
     "ctx_open_with": "Open with {app_name}",
     "ctx_add_external_app": "Add external app in Settings…",
     "ctx_copy_path": "Copy File Path",

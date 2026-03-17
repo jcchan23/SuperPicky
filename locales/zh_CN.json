@@ -1047,6 +1047,8 @@
     "rate_left_tooltip": "给左侧照片打 {i}★ (键盘 {i})",
     "rate_right_tooltip": "给右侧照片打 {i}★ (键盘 {key})",
     "ctx_show_in_finder": "在 Finder 中显示",
+    "ctx_show_in_explorer": "在资源管理器中显示",
+    "ctx_show_in_file_manager": "在文件管理器中显示",
     "ctx_open_with": "用 {app_name} 打开",
     "ctx_add_external_app": "在设置中添加外部应用…",
     "ctx_copy_path": "复制文件路径",

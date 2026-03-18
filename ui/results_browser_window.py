@@ -243,11 +243,9 @@ def _show_context_menu_impl(parent_widget, photo: dict, pos, directory: str):
 
     _i18n = get_i18n()
     if sys.platform == "win32":
-        reveal_label = _i18n.t('browser.ctx_show_in_explorer')
-    elif sys.platform == "darwin":
-        reveal_label = _i18n.t('browser.ctx_show_in_finder')
+        reveal_label = "在资源管理器中显示" if not _i18n.current_lang.startswith('en') else "Show in Explorer"
     else:
-        reveal_label = _i18n.t('browser.ctx_show_in_file_manager')
+        reveal_label = _i18n.t('browser.ctx_show_in_finder')
     finder_action = QAction(reveal_label, parent_widget)
     finder_action.setEnabled(bool(filepath))
     finder_action.triggered.connect(_reveal)

@@ -46,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def print_banner():
     """打印 CLI 横幅"""
     print("\n" + "━" * 60)
-    print(t("cli.banner", version="4.2.1"))
+    print(t("cli.banner", version="4.2.0"))
     print("━" * 60)
 
 
@@ -142,7 +142,6 @@ def cmd_process(args):
     from tools.cli_processor import CLIProcessor
     from core.photo_processor import ProcessingSettings
     from advanced_config import get_advanced_config
-    from tools.report_db import ReportDB
     
     print_banner()
     print(t("cli.target_dir", directory=args.directory))
@@ -209,31 +208,6 @@ def cmd_process(args):
         settings=settings
     )
     
-    resume = False
-    resume_db = ReportDB(args.directory)
-    try:
-        snapshot = resume_db.get_resume_snapshot()
-    finally:
-        resume_db.close()
-
-    if snapshot.get('can_resume'):
-        if args.restart:
-            print("\n⚠️ 检测到未完成任务。`--restart` 不会自动回滚目录，请先执行 `reset` 后再重新处理。")
-            return 1
-        if args.resume:
-            resume = True
-        elif sys.stdin.isatty():
-            confirm = input("\n检测到未完成任务，是否继续上次处理? [y/N]: ")
-            if confirm.lower() in ['y', 'yes']:
-                resume = True
-            else:
-                print("已取消。若要重跑，请先执行 reset 后再重新处理。")
-                return 1
-        else:
-            print("\n⚠️ 检测到未完成任务。请显式传入 --resume 继续，或先执行 reset 后重跑。")
-            return 1
-    processor.resume = resume
-    
     # 执行处理（PhotoProcessor 内部会处理自动识鸟）
     # 执行处理（PhotoProcessor 内部会处理自动识鸟）
     # V4.1: cleanup_temp 参数现在由 AdvancedConfig.keep_temp_files 控制
@@ -281,26 +255,14 @@ def cmd_reset(args):
             continue
         
         # 查找所有子目录（burst_XXX、鸟种目录等）
-        # for entry in os.listdir(rating_path):
-        #     entry_path = os.path.join(rating_path, entry)
-        #     if os.path.isdir(entry_path):
-        #         print(f"  📁 打平子目录: {rating_dir}/{entry}")
-        for entry in os.scandir(rating_path):
-            entry_path = entry.path
-            if entry.is_symlink():
-                print(f"  ⚠️ 跳过符号链接目录: {rating_dir}/{entry.name}")
-                continue
-            if entry.is_dir(follow_symlinks=False):
-                print(f"  📁 打平子目录: {rating_dir}/{entry.name}")
+        for entry in os.listdir(rating_path):
+            entry_path = os.path.join(rating_path, entry)
+            if os.path.isdir(entry_path):
+                print(f"  📁 打平子目录: {rating_dir}/{entry}")
                 # 递归将所有文件移回评分目录
                 for root, dirs, files in os.walk(entry_path):
-                    # 防御性处理：不进入任何符号链接子目录
-                    dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
                     for filename in files:
                         src = os.path.join(root, filename)
-                        if os.path.islink(src):
-                            print(f"    ⚠️ 跳过符号链接文件: {filename}")
-                            continue
                         dst = os.path.join(rating_path, filename)
                         if os.path.isfile(src):
                             try:
@@ -1024,11 +986,7 @@ Examples:
                           
     # V3.9: 使用 set_defaults 确保 flight, burst 默认为 True
     # V4.1: keep_temp 默认为 True
-    p_process.add_argument('--resume', action='store_true',
-                          help='缁х画鏈畬鎴愮殑澶勭悊浠诲姟')
-    p_process.add_argument('--restart', action='store_true',
-                          help='涓嶈嚜鍔ㄥ洖婊氾紝闇€鍏堟墽琛?reset 鍚庡啀閲嶆柊澶勭悊')
-    p_process.set_defaults(organize=True, cleanup=True, burst=True, flight=True, auto_identify=False, xmp=False, keep_temp=True, resume=False, restart=False)
+    p_process.set_defaults(organize=True, cleanup=True, burst=True, flight=True, auto_identify=False, xmp=False, keep_temp=True)
     
     # ===== reset 命令 =====
     p_reset = subparsers.add_parser('reset', help=t("cli.cmd_reset"))

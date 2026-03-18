@@ -3,7 +3,6 @@
 [![Version](https://img.shields.io/badge/version-4.2.0-blue.svg)](https://github.com/jamesphotography/SuperPicky)
 [![Platform](https://img.shields.io/badge/platform-macOS%20|%20Windows-lightgrey.svg)](https://github.com/jamesphotography/SuperPicky/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Build](https://github.com/jamesphotography/SuperPicky/actions/workflows/build-release.yml/badge.svg)](https://github.com/jamesphotography/SuperPicky/actions/workflows/build-release.yml)
 
 [**中文文档 (Chinese)**](README_zh.md) | [**Release Notes**](RELEASE_NOTES.md)
 
@@ -136,7 +135,7 @@ Review unmatched species in the report output and add manual overrides to `scrip
 
 ## 📄 License
 
-Open sourced under **GNU AFFERO GENERAL PUBLIC LICENSE Version 3**.
+Open sourced under **GPL-3.0 License**.
 
 This project uses:
 - **YOLO11** by Ultralytics

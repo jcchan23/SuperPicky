@@ -70,7 +70,6 @@ all_datas.extend(copy_metadata('imageio'))
 all_datas.extend(copy_metadata('rawpy'))
 all_datas.extend(copy_metadata('ultralytics'))
 all_datas.extend(copy_metadata('pillow_heif'))
-all_datas.extend(copy_metadata('pi_heif'))
 
 a = Analysis(
     ['main.py'],
@@ -100,7 +99,6 @@ a = Analysis(
         'imagehash',
         'pywt',
         'pillow_heif',   # HEIF/HIF 支持
-        'pi_heif',     # CUDA 版本可能需要这个 HEIF/HIF 支持
         'core',
         'core.burst_detector',
         'core.config_manager',

@@ -440,13 +440,7 @@ def load_topiq_weights(model: CFANet, weight_path: str, device: torch.device) ->
         raise FileNotFoundError(f"权重文件不存在: {weight_path}")
     
     print(_t("logs.topiq_weight_loading", name=os.path.basename(weight_path)))
-    try:
-        state_dict = torch.load(weight_path, map_location=device, weights_only=True)
-    except TypeError as exc:
-        raise RuntimeError(
-            "Current PyTorch version does not support safe weights_only loading. "
-            "Please upgrade PyTorch to load model weights securely."
-        ) from exc
+    state_dict = torch.load(weight_path, map_location=device, weights_only=False)
     
     # pyiqa 权重格式: {'params': {...}}
     if 'params' in state_dict:

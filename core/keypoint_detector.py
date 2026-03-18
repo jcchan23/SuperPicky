@@ -111,7 +111,7 @@ class KeypointDetector:
             raise FileNotFoundError(f"关键点模型不存在: {self.model_path}")
         
         self.model = PartLocalizer()
-        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=True)
         
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
             self.model.load_state_dict(checkpoint['model_state_dict'])

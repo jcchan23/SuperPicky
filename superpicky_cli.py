@@ -281,14 +281,26 @@ def cmd_reset(args):
             continue
         
         # 查找所有子目录（burst_XXX、鸟种目录等）
-        for entry in os.listdir(rating_path):
-            entry_path = os.path.join(rating_path, entry)
-            if os.path.isdir(entry_path):
-                print(f"  📁 打平子目录: {rating_dir}/{entry}")
+        # for entry in os.listdir(rating_path):
+        #     entry_path = os.path.join(rating_path, entry)
+        #     if os.path.isdir(entry_path):
+        #         print(f"  📁 打平子目录: {rating_dir}/{entry}")
+        for entry in os.scandir(rating_path):
+            entry_path = entry.path
+            if entry.is_symlink():
+                print(f"  ⚠️ 跳过符号链接目录: {rating_dir}/{entry.name}")
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                print(f"  📁 打平子目录: {rating_dir}/{entry.name}")
                 # 递归将所有文件移回评分目录
                 for root, dirs, files in os.walk(entry_path):
+                    # 防御性处理：不进入任何符号链接子目录
+                    dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
                     for filename in files:
                         src = os.path.join(root, filename)
+                        if os.path.islink(src):
+                            print(f"    ⚠️ 跳过符号链接文件: {filename}")
+                            continue
                         dst = os.path.join(rating_path, filename)
                         if os.path.isfile(src):
                             try:

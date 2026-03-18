@@ -1359,9 +1359,27 @@ class ExifToolManager:
                 if temp_jpegs:
                     log(t("logs.temp_jpeg_cleanup", count=len(temp_jpegs)))
                     deleted_temp = 0
+                    abs_dir_path = os.path.abspath(dir_path)
                     for jpeg_filename in temp_jpegs:
+                        if not isinstance(jpeg_filename, str):
+                            continue
+
+                        normalized_name = os.path.normpath(jpeg_filename)
+                        if (
+                            os.path.isabs(normalized_name)
+                            or os.path.splitdrive(normalized_name)[0]
+                            or normalized_name == '..'
+                            or normalized_name.startswith(f'..{os.sep}')
+                        ):
+                            log(t("logs.temp_jpeg_delete_failed", filename=jpeg_filename, error="invalid_path"))
+                            continue
                         # 临时 JPEG 可能在根目录或子目录中
-                        jpeg_path = os.path.join(dir_path, jpeg_filename)
+                        # jpeg_path = os.path.join(dir_path, jpeg_filename)
+                        jpeg_path = os.path.abspath(os.path.join(abs_dir_path, normalized_name))
+                        if os.path.commonpath([abs_dir_path, jpeg_path]) != abs_dir_path:
+                            log(t("logs.temp_jpeg_delete_failed", filename=jpeg_filename, error="invalid_path"))
+                            continue
+                        
                         if os.path.exists(jpeg_path):
                             try:
                                 os.remove(jpeg_path)

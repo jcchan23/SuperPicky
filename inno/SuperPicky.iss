@@ -396,7 +396,7 @@ Name: "{group}\SuperPicky"; Filename: "{app}\SuperPicky.exe"
 Name: "{commondesktop}\SuperPicky"; Filename: "{app}\SuperPicky.exe"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkablealone
 
 [Run]
 Filename: "{app}\SuperPicky.exe"; Description: "{cm:LaunchProgram,SuperPicky}"; Flags: nowait postinstall skipifsilent

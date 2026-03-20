@@ -55,15 +55,15 @@
             </p>
 
             <div class="hero-cta">
-                <a href="#download" class="btn btn-primary btn-beta">
-                    <span class="lang-cn">🆕 下载 V4.1.0 LTS</span>
-                    <span class="lang-en">🆕 Download V4.1.0 LTS</span>
-                    <span class="btn-version">AI Bird ID + Offline</span>
+                <a href="#download-beta" class="btn btn-primary btn-beta">
+                    <span class="lang-cn">🆕 下载 V4.2.1 Beta</span>
+                    <span class="lang-en">🆕 Download V4.2.1 Beta</span>
+                    <span class="btn-version">Latest Beta</span>
                 </a>
-                <a href="downloads.html" class="btn btn-secondary">
-                    <span class="lang-cn">历史版本</span>
-                    <span class="lang-en">Previous Versions</span>
-                    <span class="btn-version">Archive</span>
+                <a href="#download" class="btn btn-secondary">
+                    <span class="lang-cn">⬇️ V4.1.0 LTS 稳定版</span>
+                    <span class="lang-en">⬇️ V4.1.0 LTS Stable</span>
+                    <span class="btn-version">Recommended</span>
                 </a>
                 <a href="#features" class="btn btn-ghost">
                     <span class="lang-cn">了解更多</span>
@@ -312,13 +312,83 @@
         </div>
     </section>
 
+    <!-- Beta Download Section -->
+    <section class="download-section" id="download-beta">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">
+                    <span class="lang-cn">🆕 下载 V4.2.1 Beta</span>
+                    <span class="lang-en">🆕 Download V4.2.1 Beta</span>
+                </span>
+            </div>
+            <div class="download-cards">
+                <!-- Mac ARM64 V4.2.1-Beta -->
+                <div class="download-card featured">
+                    <div class="download-info">
+                        <div class="download-icon">
+                            <img src="img/icon.png" alt="SuperPicky">
+                        </div>
+                        <div class="download-meta">
+                            <h3>SuperPicky <span class="platform-badge">macOS</span> <span class="beta-badge">🆕 V4.2.1-Beta</span></h3>
+                            <p class="download-version">v4.2.1-beta · Apple Silicon (M1/M2/M3/M4)</p>
+                        </div>
+                    </div>
+                    <div class="download-links">
+                        <a href="https://github.com/jamesphotography/SuperPicky/releases/download/v4.2.1-beta/SuperPicky_v4.2.1-beta_arm64_ec200340.dmg"
+                            class="btn btn-primary" target="_blank">
+                            GitHub
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Windows CPU V4.2.1-Beta -->
+                <div class="download-card windows">
+                    <div class="download-info">
+                        <div class="download-icon">
+                            <img src="img/icon.png" alt="SuperPicky">
+                        </div>
+                        <div class="download-meta">
+                            <h3>SuperPicky <span class="platform-badge">Windows</span> <span class="beta-badge">🆕 V4.2.1-Beta</span></h3>
+                            <p class="download-version">v4.2.1-beta · CPU Only (No CUDA) · x64</p>
+                        </div>
+                    </div>
+                    <div class="download-links">
+                        <a href="https://github.com/jamesphotography/SuperPicky/releases/download/v4.2.1-beta/SuperPicky_Win64_4.2.1-beta_ec20034_cpu.zip"
+                            class="btn btn-primary" target="_blank">
+                            GitHub
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Windows GPU V4.2.1-Beta -->
+                <div class="download-card windows">
+                    <div class="download-info">
+                        <div class="download-icon">
+                            <img src="img/icon.png" alt="SuperPicky">
+                        </div>
+                        <div class="download-meta">
+                            <h3>SuperPicky <span class="platform-badge">Windows</span> <span class="beta-badge">Beta V4.2.1</span></h3>
+                            <p class="download-version">v4.2.1-beta · NVIDIA CUDA GPU Patch · x64</p>
+                        </div>
+                    </div>
+                    <div class="download-links">
+                        <a href="https://github.com/jamesphotography/SuperPicky/releases/download/v4.2.1-beta/SuperPicky_Win64_4.2.1-beta_ec20034_cuda_patch.zip"
+                            class="btn btn-primary" target="_blank">
+                            GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Download Section -->
     <section class="download-section" id="download">
         <div class="container">
             <div class="section-header">
                 <span class="section-label">
-                    <span class="lang-cn">下载 V4.1.0 LTS</span>
-                    <span class="lang-en">Download V4.1.0 LTS</span>
+                    <span class="lang-cn">下载 V4.1.0 LTS 稳定版</span>
+                    <span class="lang-en">Download V4.1.0 LTS Stable</span>
                 </span>
             </div>
 
@@ -526,6 +596,20 @@
                         <span class="lang-en">Windows Build</span>
                     </div>
                 </a>
+                <a href="https://github.com/jcchan23" class="team-card" target="_blank">
+                    <div class="team-role">
+                        <span class="lang-cn">模型移植与瘦身</span>
+                        <span class="lang-en">Model Porting & Optimization</span>
+                    </div>
+                    <div class="team-name">
+                        <span class="lang-cn">Jianwen Chen</span>
+                        <span class="lang-en">Jianwen Chen</span>
+                    </div>
+                    <div class="team-desc">
+                        <span class="lang-cn">模型移植与轻量化优化</span>
+                        <span class="lang-en">Model Porting & Lightweight Optimization</span>
+                    </div>
+                </a>
             </div>
         </div>
     </section>
@@ -604,6 +688,10 @@
                     <a href="faq.html">
                         <span class="lang-cn">常见问题</span>
                         <span class="lang-en">FAQ</span>
+                    </a>
+                    <a href="sponsors.html">
+                        <span class="lang-cn">赞助者</span>
+                        <span class="lang-en">Sponsors</span>
                     </a>
                     <a href="cli-reference.md">
                         <span class="lang-cn">CLI 参考</span>

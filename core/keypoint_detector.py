@@ -14,6 +14,7 @@ import numpy as np
 import cv2
 from dataclasses import dataclass
 from typing import Optional, Tuple
+from config import get_best_device
 
 
 @dataclass
@@ -78,11 +79,11 @@ class KeypointDetector:
         import sys
         if hasattr(sys, '_MEIPASS'):
             # PyInstaller 打包后的路径
-            return os.path.join(sys._MEIPASS, 'models', 'cub200_keypoint_resnet50.pth')
+            return os.path.join(sys._MEIPASS, 'models', 'cub200_keypoint_resnet50_slim.pth')
         else:
             # 开发环境：从当前文件向上找项目根目录
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            return os.path.join(project_root, 'models', 'cub200_keypoint_resnet50.pth')
+            return os.path.join(project_root, 'models', 'cub200_keypoint_resnet50_slim.pth')
     
     def __init__(self, model_path: str = None):
         """
@@ -93,7 +94,6 @@ class KeypointDetector:
         """
         self.model_path = model_path or self._get_default_model_path()
         # 使用统一的设备检测逻辑
-        from config import get_best_device
         self.device = get_best_device()
         self.model = None
         self.transform = transforms.Compose([
@@ -111,7 +111,7 @@ class KeypointDetector:
             raise FileNotFoundError(f"关键点模型不存在: {self.model_path}")
         
         self.model = PartLocalizer()
-        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=True)
         
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
             self.model.load_state_dict(checkpoint['model_state_dict'])

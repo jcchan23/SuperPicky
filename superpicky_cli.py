@@ -46,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def print_banner():
     """打印 CLI 横幅"""
     print("\n" + "━" * 60)
-    print(t("cli.banner", version="4.1.0"))
+    print(t("cli.banner", version="4.2.0"))
     print("━" * 60)
 
 
@@ -255,14 +255,22 @@ def cmd_reset(args):
             continue
         
         # 查找所有子目录（burst_XXX、鸟种目录等）
-        for entry in os.listdir(rating_path):
-            entry_path = os.path.join(rating_path, entry)
-            if os.path.isdir(entry_path):
-                print(f"  📁 打平子目录: {rating_dir}/{entry}")
+        for entry in os.scandir(rating_path):
+            entry_path = entry.path
+            if entry.is_symlink():
+                print(f"  ⚠️ 跳过符号链接目录: {rating_dir}/{entry.name}")
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                print(f"  📁 打平子目录: {rating_dir}/{entry.name}")
                 # 递归将所有文件移回评分目录
                 for root, dirs, files in os.walk(entry_path):
+                    # 防御性处理：不进入任何符号链接子目录
+                    dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
                     for filename in files:
                         src = os.path.join(root, filename)
+                        if os.path.islink(src):
+                            print(f"    ⚠️ 跳过符号链接文件: {filename}")
+                            continue
                         dst = os.path.join(rating_path, filename)
                         if os.path.isfile(src):
                             try:
@@ -272,14 +280,14 @@ def cmd_reset(args):
                                 subdir_stats['files_restored'] += 1
                             except Exception as e:
                                 print(f"    ⚠️ 移动失败: {filename}: {e}")
-                    
+
                 # 删除子目录
                 try:
                     if os.path.exists(entry_path):
                         shutil.rmtree(entry_path)
                     subdir_stats['dirs_removed'] += 1
                 except Exception as e:
-                    print(f"    ⚠️ 删除目录失败: {entry}: {e}")
+                    print(f"    ⚠️ 删除目录失败: {entry.name}: {e}")
     
     if subdir_stats['dirs_removed'] > 0:
         print(f"  ✅ 已清理 {subdir_stats['dirs_removed']} 个子目录，恢复 {subdir_stats['files_restored']} 个文件")
@@ -413,30 +421,40 @@ def cmd_restar(args):
         if not os.path.exists(rating_path):
             continue
         
-        for entry in os.listdir(rating_path):
-            if entry.startswith('burst_'):
-                burst_path = os.path.join(rating_path, entry)
-                if os.path.isdir(burst_path):
-                    for filename in os.listdir(burst_path):
-                        src = os.path.join(burst_path, filename)
-                        dst = os.path.join(rating_path, filename)
-                        if os.path.isfile(src):
-                            try:
-                                if os.path.exists(dst):
-                                    os.remove(dst)
-                                shutil.move(src, dst)
-                                burst_stats['files_restored'] += 1
-                            except Exception as e:
-                                print(f"    ⚠️ 移动失败: {filename}: {e}")
-                    
+        for entry in os.scandir(rating_path):
+            if not entry.name.startswith('burst_'):
+                continue
+
+            burst_path = entry.path
+            if entry.is_symlink():
+                print(f"    ⚠️ 跳过符号链接连拍目录: {entry.name}")
+                continue
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+
+            for filename in os.listdir(burst_path):
+                src = os.path.join(burst_path, filename)
+                dst = os.path.join(rating_path, filename)
+                if os.path.islink(src):
+                    print(f"    ⚠️ 跳过符号链接文件: {filename}")
+                    continue
+                if os.path.isfile(src):
                     try:
-                        if not os.listdir(burst_path):
-                            os.rmdir(burst_path)
-                        else:
-                            shutil.rmtree(burst_path)
-                        burst_stats['dirs_removed'] += 1
+                        if os.path.exists(dst):
+                            os.remove(dst)
+                        shutil.move(src, dst)
+                        burst_stats['files_restored'] += 1
                     except Exception as e:
-                        print(f"    ⚠️ 删除目录失败: {entry}: {e}")
+                        print(f"    ⚠️ 移动失败: {filename}: {e}")
+
+            try:
+                if not os.listdir(burst_path):
+                    os.rmdir(burst_path)
+                else:
+                    shutil.rmtree(burst_path)
+                burst_stats['dirs_removed'] += 1
+            except Exception as e:
+                print(f"    ⚠️ 删除目录失败: {entry.name}: {e}")
     
     if burst_stats['dirs_removed'] > 0:
         print(f"  ✅ 已清理 {burst_stats['dirs_removed']} 个连拍目录，恢复 {burst_stats['files_restored']} 个文件")
@@ -767,6 +785,154 @@ def cmd_identify(args):
     return 0
 
 
+def cmd_batch(args):
+    """递归批量处理子目录"""
+    from core.recursive_scanner import scan_recursive, count_photos, is_processed
+    from core.batch_processor import BatchProcessor
+    from core.photo_processor import ProcessingSettings
+    from advanced_config import get_advanced_config
+    
+    print_banner()
+    print(f"\n📂 批量处理: {args.directory}")
+    
+    # 扫描
+    dirs = scan_recursive(args.directory, max_depth=args.max_depth)
+    
+    if not dirs:
+        print("\n❌ 未找到包含照片的子目录")
+        return 1
+    
+    # 预览
+    print(f"\n🔍 找到 {len(dirs)} 个待处理目录:")
+    total_photos = 0
+    for i, d in enumerate(dirs, 1):
+        rel = os.path.relpath(d, args.directory)
+        n = count_photos(d)
+        processed = is_processed(d)
+        status = " (已处理)" if processed else ""
+        print(f"  {i:3d}. {rel}/ ({n} 张){status}")
+        total_photos += n
+    print(f"\n  合计: {total_photos} 张照片")
+    
+    # Dry run
+    if args.dry_run:
+        print("\n📋 Dry run 模式，不执行处理")
+        return 0
+    
+    # 确认
+    if not args.yes:
+        confirm = input(f"\n确定处理这 {len(dirs)} 个目录? [y/N]: ")
+        if confirm.lower() not in ['y', 'yes']:
+            print("❌ 已取消")
+            return 1
+    
+    # 更新高级配置
+    adv_config = get_advanced_config()
+    adv_config.config["arw_write_mode"] = "sidecar" if args.xmp else "embedded"
+    if hasattr(args, 'keep_temp'):
+        adv_config.config["keep_temp_files"] = args.keep_temp
+    elif not args.cleanup:
+        adv_config.config["keep_temp_files"] = True
+    adv_config.save()
+    
+    # 构建 ProcessingSettings
+    auto_identify = getattr(args, 'auto_identify', False)
+    settings = ProcessingSettings(
+        ai_confidence=args.confidence,
+        sharpness_threshold=args.sharpness,
+        nima_threshold=args.nima_threshold,
+        normalization_mode='log_compression',
+        detect_flight=args.flight,
+        detect_exposure=True,
+        detect_burst=args.burst,
+        auto_identify=auto_identify,
+        save_crop=getattr(args, 'save_crop', False),
+        birdid_use_ebird=True,
+        birdid_country_code=getattr(args, 'birdid_country', None),
+        birdid_region_code=getattr(args, 'birdid_region', None),
+        birdid_confidence_threshold=getattr(args, 'birdid_threshold', 70.0),
+    )
+    
+    # 执行批量处理
+    processor = BatchProcessor(
+        root_dir=args.directory,
+        settings=settings,
+        skip_existing=args.skip_existing,
+        max_depth=args.max_depth,
+    )
+    
+    result = processor.process(
+        dirs=dirs,
+        organize_files=args.organize,
+        cleanup_temp=not adv_config.keep_temp_files,
+    )
+    
+    print("\n✅ 批量处理完成!")
+    return 0 if result.failed_dirs == 0 else 1
+
+
+def cmd_batch_reset(args):
+    """批量重置所有已处理的子目录"""
+    from core.recursive_scanner import is_processed
+    from tools.merged_report_db import find_processed_subdirs
+    import shutil
+    
+    print_banner()
+    print(f"\n\U0001f504 batch reset: {args.directory}")
+    
+    # Find all processed directories (including root)
+    processed_dirs = find_processed_subdirs(args.directory)
+    
+    if not processed_dirs:
+        print("\n❌ 未找到已处理的子目录")
+        return 1
+    
+    print(f"\n🔍 找到 {len(processed_dirs)} 个已处理目录:")
+    for i, d in enumerate(processed_dirs, 1):
+        rel = os.path.relpath(d, args.directory)
+        print(f"  {i:3d}. {rel}/")
+    
+    if not args.yes:
+        confirm = input(f"\n⚠️  确定重置这 {len(processed_dirs)} 个目录? [y/N]: ")
+        if confirm.lower() not in ['y', 'yes']:
+            print("❌ 已取消")
+            return 1
+    
+    # 逐个重置（复用 cmd_reset 的核心逻辑）
+    success_count = 0
+    fail_count = 0
+    for i, d in enumerate(processed_dirs, 1):
+        rel = os.path.relpath(d, args.directory)
+        print(f"\n{'━' * 40}")
+        print(f"🔄 [{i}/{len(processed_dirs)}] 重置: {rel}/")
+        
+        # 创建一个模拟的 args 对象给 cmd_reset
+        class ResetArgs:
+            pass
+        reset_args = ResetArgs()
+        reset_args.directory = d
+        reset_args.yes = True  # 已经确认过了
+        
+        try:
+            ret = cmd_reset(reset_args)
+            if ret == 0:
+                success_count += 1
+            else:
+                fail_count += 1
+        except Exception as e:
+            print(f"  ❌ 重置失败: {e}")
+            fail_count += 1
+    
+    # 清理批量报告
+    batch_report = os.path.join(args.directory, '.superpicky_batch.json')
+    if os.path.exists(batch_report):
+        os.remove(batch_report)
+    
+    print(f"\n{'═' * 40}")
+    print(f"📊 批量重置完成: {success_count} 成功, {fail_count} 失败")
+    return 0 if fail_count == 0 else 1
+
+
 def main():
     """主入口"""
     parser = argparse.ArgumentParser(
@@ -899,6 +1065,52 @@ Examples:
     p_identify.add_argument('--write-exif', action='store_true',
                            help='将识别结果写入 EXIF Title')
     p_identify.set_defaults(yolo=True, gps=True)
+    
+    # ===== batch 命令 =====
+    p_batch = subparsers.add_parser('batch', help='递归批量处理子目录')
+    p_batch.add_argument('directory', help='根目录路径')
+    p_batch.add_argument('-s', '--sharpness', type=int, default=400,
+                        help='锐度阈值 (默认: 400)')
+    p_batch.add_argument('-n', '--nima-threshold', type=float, default=5.0,
+                        help='美学阈值 (默认: 5.0)')
+    p_batch.add_argument('-c', '--confidence', type=int, default=50,
+                        help='AI置信度阈值 (默认: 50)')
+    p_batch.add_argument('--flight', action='store_true', dest='flight',
+                        help='识别飞鸟 (默认: 开启)')
+    p_batch.add_argument('--no-flight', action='store_false', dest='flight')
+    p_batch.add_argument('--burst', action='store_true', dest='burst',
+                        help='连拍检测 (默认: 开启)')
+    p_batch.add_argument('--no-burst', action='store_false', dest='burst')
+    p_batch.add_argument('--xmp', action='store_true', dest='xmp',
+                        help='写入XMP侧车')
+    p_batch.add_argument('--no-xmp', action='store_false', dest='xmp')
+    p_batch.add_argument('--no-organize', action='store_false', dest='organize')
+    p_batch.add_argument('--no-cleanup', action='store_false', dest='cleanup')
+    p_batch.add_argument('--auto-identify', '-i', action='store_true')
+    p_batch.add_argument('--birdid-country', type=str, default=None)
+    p_batch.add_argument('--birdid-region', type=str, default=None)
+    p_batch.add_argument('--birdid-threshold', type=float, default=70.0)
+    p_batch.add_argument('--save-crop', action='store_true')
+    p_batch.add_argument('--keep-temp-files', action='store_true', dest='keep_temp')
+    p_batch.add_argument('--no-keep-temp-files', action='store_false', dest='keep_temp')
+    p_batch.add_argument('--skip-existing', action='store_true',
+                        help='跳过已处理的目录')
+    p_batch.add_argument('--dry-run', action='store_true',
+                        help='仅列出待处理目录，不执行')
+    p_batch.add_argument('--max-depth', type=int, default=10,
+                        help='最大递归深度 (默认: 10)')
+    p_batch.add_argument('-y', '--yes', action='store_true',
+                        help='跳过确认提示')
+    p_batch.add_argument('-q', '--quiet', action='store_true')
+    p_batch.set_defaults(organize=True, cleanup=True, burst=True, flight=True,
+                        auto_identify=False, xmp=False, keep_temp=True,
+                        skip_existing=False, dry_run=False)
+    
+    # ===== batch-reset 命令 =====
+    p_batch_reset = subparsers.add_parser('batch-reset', help='批量重置所有已处理的子目录')
+    p_batch_reset.add_argument('directory', help='根目录路径')
+    p_batch_reset.add_argument('-y', '--yes', action='store_true',
+                              help='跳过确认提示')
 
     # 解析参数
     args = parser.parse_args()
@@ -933,6 +1145,10 @@ Examples:
         return cmd_burst(args)
     elif args.command == 'identify':
         return cmd_identify(args)
+    elif args.command == 'batch':
+        return cmd_batch(args)
+    elif args.command == 'batch-reset':
+        return cmd_batch_reset(args)
     else:
         parser.print_help()
         return 1

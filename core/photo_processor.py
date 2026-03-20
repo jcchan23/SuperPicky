@@ -54,7 +54,7 @@ class ProcessingSettings:
     ai_confidence: int = 50
     sharpness_threshold: int = 400   # 头部区域锐度达标阈值 (200-600)
     nima_threshold: float = 5.0      # V3.9.4: TOPIQ 美学达标阈值，与 GUI 滑块默认值一致
-    save_crop: bool = False
+    save_crop: bool = True
     normalization_mode: str = 'log_compression'  # 默认使用log_compression，与GUI一致
     detect_flight: bool = True       # V3.4: 飞版检测开关
     detect_exposure: bool = True     # V3.9.4: 曝光检测开关（默认开启，与 GUI 一致）
@@ -1163,8 +1163,8 @@ class PhotoProcessor:
         # 如需强制开启/关闭，可通过 SUPERPICKY_YOLO_PREFETCH 覆盖。
         mps_available = False
         try:
-            import torch
-            mps_available = bool(getattr(torch.backends, "mps", None) and torch.backends.mps.is_available())
+            from config import get_best_device
+            mps_available = bool(get_best_device().type == 'mps')
         except Exception:
             mps_available = False
         
@@ -1498,7 +1498,8 @@ class PhotoProcessor:
                 if detected and bird_bbox is not None and img_dims is not None:
                     try:
                         import cv2 as _cv2_early
-                        _orig = _cv2_early.imread(filepath)
+                        # _orig = _cv2_early.imread(filepath)
+                        _orig = _cv2_early.imdecode(np.fromfile(filepath, dtype=np.uint8), _cv2_early.IMREAD_COLOR)
                         if _orig is not None:
                             _h, _w = _orig.shape[:2]
                             _sw, _sh = img_dims
@@ -1547,7 +1548,8 @@ class PhotoProcessor:
             if use_keypoints and detected and bird_bbox is not None and img_dims is not None:
                 try:
                     import cv2
-                    orig_img = cv2.imread(filepath)  # 只读取一次!
+                    # orig_img = cv2.imread(filepath)  # 只读取一次!
+                    orig_img = cv2.imdecode(np.fromfile(filepath, dtype=np.uint8), cv2.IMREAD_COLOR)
                     if orig_img is not None:
                         h_orig, w_orig = orig_img.shape[:2]
                         # 获取YOLO处理时的图像尺寸

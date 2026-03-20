@@ -54,6 +54,7 @@ ebird_cache/
 
 # 虚拟环境
 .venv/
+.venv-cuda/
 venv/
 
 # 模型文件（临时模型不上传，基础模型需要上传）
@@ -109,6 +110,7 @@ pkg_root/
 
 # Models and Data downloaded from Hugging Face
 models/*.pth
+models/*.onnx
 birdid/data/avonet.db
 
 # 针对各平台的临时宣发与推广素材（不上云）

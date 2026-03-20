@@ -59,7 +59,9 @@ jobs:
 
       - name: Build CPU and CUDA patch release payloads
         shell: pwsh
-        run: .\.venv\Scripts\python.exe build_release_win.py --build-type cuda-patch --copy-dir output --debug
+        run: |
+          .\.venv\Scripts\python.exe scripts\download_models.py
+          .\.venv\Scripts\python.exe build_release_win.py --build-type cuda-patch --copy-dir output --debug
 
       - name: Create CPU installer with Inno Setup
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.7

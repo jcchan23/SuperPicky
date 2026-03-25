@@ -278,20 +278,6 @@ header {
     border-color: var(--text-tertiary);
 }
 
-.btn-mirror {
-    background: rgba(255, 140, 60, 0.12);
-    color: #ff8c3c;
-    border: 1px solid rgba(255, 140, 60, 0.3);
-}
-
-.btn-mirror:hover {
-    background: rgba(255, 140, 60, 0.2);
-    color: #ffaa66;
-    border-color: rgba(255, 140, 60, 0.6);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 140, 60, 0.15);
-}
-
 .btn-beta {
     animation: beta-pulse 2s ease-in-out infinite;
     box-shadow: 0 0 20px var(--accent-glow);

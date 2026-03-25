@@ -22,6 +22,8 @@ from config import get_best_device
 # ==================== 设备配置 ====================
 
 CLASSIFIER_DEVICE = get_best_device()
+# BirdID 分类器始终运行在 CPU，确保多线程并行安全（MPS/CUDA 不支持并发 forward）
+BIRDID_CLASSIFIER_DEVICE = torch.device("cpu")
 
 # ==================== 可选依赖检测 ====================
 
@@ -154,10 +156,10 @@ def get_classifier():
             model = models.resnet34(num_classes=OSEA_NUM_CLASSES)
             state_dict = torch.load(MODEL_PATH, map_location='cpu', weights_only=True)
             model.load_state_dict(state_dict)
-            model = model.to(CLASSIFIER_DEVICE)
+            model = model.to(BIRDID_CLASSIFIER_DEVICE)
             model.eval()
             _classifier = model
-            print(f"[BirdID] OSEA ResNet34 model loaded, device: {CLASSIFIER_DEVICE}")
+            print(f"[BirdID] OSEA ResNet34 model loaded, device: {BIRDID_CLASSIFIER_DEVICE}")
         else:
             # 回退到旧的 birdid2024 模型
             SECRET_PASSWORD = "SuperBirdID_2024_AI_Model_Encryption_Key_v1"
@@ -722,7 +724,7 @@ def predict_bird(
     if image.mode != 'RGB':
         image = image.convert('RGB')
     transform = OSEA_TRANSFORM_DIRECT if is_yolo_cropped else OSEA_TRANSFORM
-    input_tensor = transform(image).unsqueeze(0).to(CLASSIFIER_DEVICE)
+    input_tensor = transform(image).unsqueeze(0).to(BIRDID_CLASSIFIER_DEVICE)
 
     # 推理
     with torch.no_grad():

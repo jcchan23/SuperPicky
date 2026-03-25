@@ -83,41 +83,20 @@ def _raw_to_jpeg_via_heif(raw_file_path, jpg_file_path, directory_path):
 
 def _raw_to_jpeg_via_exiftool(raw_file_path, jpg_file_path, directory_path):
     """
-    使用 ExifTool 从 RAW 提取内嵌 JPEG。
+    使用 ExifTool 从 RAW 提取内嵌 JPEG (V4.2.1: 使用统一的 ExifToolManager)
     用于 LibRaw 不支持的格式（如 Sony A7M5 NeXt/Compressed RAW 2）。
     """
-    import subprocess
-    import sys
-
-    # V3.9.4: 处理 Windows 平台的可执行文件后缀和路径
-    is_windows = sys.platform.startswith('win')
-    exe_name = 'exiftool.exe' if is_windows else 'exiftool'
-    exiftool_dir = 'exiftools_win' if is_windows else 'exiftools_mac'
-
-    # 查找 exiftool（同 exiftool_manager 逻辑）
-    possible_paths = []
-    if getattr(sys, "frozen", False):
-        possible_paths.append(os.path.join(sys._MEIPASS, exiftool_dir, exe_name))
+    manager = get_exiftool_manager()
     
-    # 获取 tools 目录的父目录（项目根目录）
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    possible_paths += [
-        os.path.join(project_root, exiftool_dir, exe_name),
-        "/opt/homebrew/bin/exiftool",
-        "/usr/local/bin/exiftool",
-        exe_name,
-    ]
-    exiftool = next((p for p in possible_paths if os.path.isfile(p)), exe_name)
-
+    # 按优先级尝试提取不同的内嵌图
     for tag in ["-JpgFromRaw", "-PreviewImage", "-ThumbnailImage"]:
         try:
-            result = subprocess.run(
-                [exiftool, "-b", tag, raw_file_path],
-                capture_output=True, timeout=15
-            )
-            if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
+            # 使用常驻进程提取二进制
+            stdout_bytes = manager.extract_binary(raw_file_path, tag)
+            
+            if stdout_bytes and len(stdout_bytes) > 1000:
                 with open(jpg_file_path, "wb") as f:
-                    f.write(result.stdout)
+                    f.write(stdout_bytes)
                 log_message(f"ExifTool {tag} fallback OK: {os.path.basename(raw_file_path)}", directory_path)
                 return jpg_file_path
         except Exception as e:

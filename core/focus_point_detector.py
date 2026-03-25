@@ -14,59 +14,15 @@ Focus Point Detector - 对焦点检测器
 
 from dataclasses import dataclass
 from typing import Optional, Tuple
-import subprocess
 import json
 import math
 import numpy as np
-import atexit
 import sys
 import os
+from tools.exiftool_manager import get_exiftool_manager
 
 
-# ============ Exiftool 常驻进程管理 ============
-# 使用 -stay_open 模式保持进程常驻，避免每次启动的开销
-_exiftool_process = None
-
-
-def _start_exiftool_process(exiftool_path: str = 'exiftool'):
-    """启动 exiftool 常驻进程"""
-    global _exiftool_process
-    try:
-        # V3.9.4: 在 Windows 上隐藏控制台窗口
-        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform.startswith('win') else 0
-        
-        _exiftool_process = subprocess.Popen(
-            [exiftool_path, '-charset', 'utf8', '-stay_open', 'True', '-@', '-'],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=False,  # 使用 bytes 模式，避免自动解码
-            creationflags=creationflags,  # 隐藏窗口
-            bufsize=0  # 无缓冲（二进制模式不支持行缓冲）
-        )
-        return _exiftool_process
-    except Exception:
-        return None
-
-
-def _stop_exiftool_process():
-    """停止 exiftool 常驻进程"""
-    global _exiftool_process
-    if _exiftool_process is not None:
-        try:
-            _exiftool_process.stdin.write('-stay_open\nFalse\n'.encode('utf-8'))
-            _exiftool_process.stdin.flush()
-            _exiftool_process.wait(timeout=5)
-        except Exception:
-            try:
-                _exiftool_process.kill()
-            except Exception:
-                pass
-        _exiftool_process = None
-
-
-# 程序退出时自动清理进程
-atexit.register(_stop_exiftool_process)
+# ExifTool management consolidated into tools/exiftool_manager.py (V4.0.7)
 
 
 @dataclass
@@ -178,14 +134,11 @@ class FocusPointDetector:
         'ExifImageHeight',
     ]
     
-    def __init__(self, exiftool_path: str = 'exiftool'):
+    def __init__(self):
         """
-        初始化检测器
-        
-        Args:
-            exiftool_path: ExifTool 可执行文件路径
+        初始化检测器 (V4.2.1: 使用统一的 ExifToolManager)
         """
-        self.exiftool_path = exiftool_path
+        pass
     
     def detect(self, raw_path: str) -> Optional[FocusPointResult]:
         """
@@ -726,108 +679,15 @@ class FocusPointDetector:
         )
     
     def _read_exif(self, file_path: str, tags: list) -> Optional[dict]:
-        """读取指定的 EXIF 标签（使用常驻进程模式）"""
-        global _exiftool_process
+        """读取指定的 EXIF 标签 (V4.2.1: 使用统一的 ExifToolManager 常驻进程)"""
+        manager = get_exiftool_manager()
         
-        # -stay_open 模式按换行分割参数；文件名包含换行会导致参数注入
-        # 此时回退到单次调用（argv 列表）以保证文件名按原样传递
-        if any(ch in file_path for ch in ('\n', '\r')):
-            return self._read_exif_single(file_path, tags)
-        
-        # 使用全局常驻进程
-        if _exiftool_process is None or _exiftool_process.poll() is not None:
-            _exiftool_process = _start_exiftool_process(self.exiftool_path)
-        
-        if _exiftool_process is None:
-            # 回退到单次调用模式
-            return self._read_exif_single(file_path, tags)
-        
-        try:
-            # 构建参数
-            args = ['-j', '-n']
-            for tag in tags:
-                args.append(f'-{tag}')
-            args.append(file_path)
-            
-            # 发送命令到常驻进程
-            cmd_str = '\n'.join(args) + '\n-execute\n'
-            _exiftool_process.stdin.write(cmd_str.encode('utf-8'))
-            _exiftool_process.stdin.flush()
-            
-            # 读取响应（直到 {ready} 标记）
-            output_bytes = b""
-            while True:
-                line_bytes = _exiftool_process.stdout.readline()
-                if not line_bytes:
-                    break
-                output_bytes += line_bytes
-                if b'{ready}' in line_bytes:
-                    break
-            
-            # 尝试多种编码解码
-            decoded_output = None
-            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
-                try:
-                    decoded_output = output_bytes.decode(encoding)
-                    break
-                except UnicodeDecodeError:
-                    continue
-            
-            if decoded_output is None:
-                # 如果所有编码都失败，使用 latin-1 作为最后手段（不会失败）
-                decoded_output = output_bytes.decode('latin-1')
-            
-            # 解析 JSON
-            output = decoded_output.strip()
-            if output:
-                data = json.loads(output)
-                return data[0] if data else None
-            return None
-        except Exception:
-            return self._read_exif_single(file_path, tags)
-    
-    def _read_exif_single(self, file_path: str, tags: list) -> Optional[dict]:
-        """读取 EXIF（单次调用模式，作为回退）"""
-        cmd = [self.exiftool_path, '-j', '-n']
+        # 构建参数: -n (数值输出), -charset utf8
+        extra_args = ['-n', '-charset', 'utf8']
         for tag in tags:
-            cmd.append(f'-{tag}')
-        cmd.append(file_path)
-        
-        try:
-            # V3.9.4: 在 Windows 上隐藏控制台窗口
-            creationflags = subprocess.CREATE_NO_WINDOW if sys.platform.startswith('win') else 0
+            extra_args.append(f'-{tag}')
             
-            result = subprocess.run(
-                [self.exiftool_path, '-charset', 'utf8'] + cmd[1:], 
-                capture_output=True, 
-                text=False,  # 使用 bytes 模式，避免自动解码
-                timeout=30, 
-                creationflags=creationflags
-            )
-            if result.returncode != 0:
-                return None
-            
-            stdout_bytes = result.stdout or b""
-            if not stdout_bytes.strip():
-                return None
-            
-            # 尝试多种编码解码
-            decoded_output = None
-            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
-                try:
-                    decoded_output = stdout_bytes.decode(encoding)
-                    break
-                except UnicodeDecodeError:
-                    continue
-            
-            if decoded_output is None:
-                # 如果所有编码都失败，使用 latin-1 作为最后手段（不会失败）
-                decoded_output = stdout_bytes.decode('latin-1')
-                
-            data = json.loads(decoded_output)
-            return data[0] if data else None
-        except Exception:
-            return None
+        return manager.read_metadata(file_path, extra_args=extra_args)
     
     def _apply_crop_correction(
         self, 
@@ -1000,60 +860,9 @@ def verify_focus_in_bbox(
 _focus_detector: Optional[FocusPointDetector] = None
 
 
-def _get_exiftool_path() -> str:
-    """获取 exiftool 路径（支持 PyInstaller 打包）"""
-    # V3.9.4: 处理 Windows 平台的可执行文件后缀
-    is_windows = sys.platform.startswith('win')
-    exe_name = 'exiftool.exe' if is_windows else 'exiftool'
-
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller 打包后 - V4.0.2: 使用平台特定目录
-        if is_windows:
-            path = os.path.join(sys._MEIPASS, 'exiftools_win', exe_name)
-        else:
-            path = os.path.join(sys._MEIPASS, 'exiftools_mac', exe_name)
-        if not os.path.exists(path):
-            # 备选路径
-            fallback = os.path.join(sys._MEIPASS, 'exiftools_mac', 'exiftool')
-            if os.path.exists(fallback):
-                path = fallback
-        print(f"🔍 FocusPointDetector: 使用打包 exiftool: {path}")
-        return path
-    else:
-        # 开发环境：V4.0.4 优先使用项目目录的 exiftool（确保支持最新相机如 Nikon Z6-3）
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        # 优先检查平台特定目录
-        if is_windows:
-            project_exiftool = os.path.join(project_root, 'exiftools_win', exe_name)
-        else:
-            project_exiftool = os.path.join(project_root, 'exiftools_mac', exe_name)
-        
-        if os.path.exists(project_exiftool):
-            return project_exiftool
-        
-        # 回退：检查项目根目录
-        if is_windows:
-            win_path = os.path.join(project_root, 'exiftool.exe')
-            if os.path.exists(win_path):
-                return win_path
-        else:
-            mac_path = os.path.join(project_root, 'exiftool')
-            if os.path.exists(mac_path):
-                return mac_path
-        
-        # 最后回退：使用系统 exiftool
-        import shutil
-        system_exiftool = shutil.which('exiftool')
-        if system_exiftool:
-            return system_exiftool
-        
-        return 'exiftool'  # 让系统报错
-
-
 def get_focus_detector() -> FocusPointDetector:
-    """获取对焦点检测器单例"""
+    """获取对焦点检测器单例 (V4.2.1)"""
     global _focus_detector
     if _focus_detector is None:
-        _focus_detector = FocusPointDetector(exiftool_path=_get_exiftool_path())
+        _focus_detector = FocusPointDetector()
     return _focus_detector

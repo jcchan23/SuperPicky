@@ -514,87 +514,102 @@ class PhotoProcessor:
         """
         start_time = time.time()
         self.stats['start_time'] = start_time
-        
-        # 阶段1: 文件扫描
-        raw_dict, jpg_dict, files_tbr = self._scan_files()
-        
-        # 阶段1.5: V4.0.4 早期连拍检测（只基于时间戳）
-        if self.settings.detect_burst:
-            self.burst_map = self._detect_bursts_early(raw_dict)
-        
-        # 阶段2: RAW转换
-        raw_files_to_convert = self._identify_raws_to_convert(raw_dict, jpg_dict, files_tbr)
-        if raw_files_to_convert:
-            self._convert_raws(raw_files_to_convert, files_tbr)
+        exiftool_mgr = None
+        exiftool_session_opened = False
+        metadata_write_mode = str(get_advanced_config().get_metadata_write_mode()).strip().lower()
 
-        files_tbr = self._sort_processing_files(files_tbr)
-        display_start = 1
-        display_total = len(files_tbr)
-        ordered_prefixes = [self._resume_prefix(item) for item in files_tbr]
-        if resume:
-            plan = self.resume_state.get_resume_plan(ordered_prefixes)
-            if plan:
-                prefix_to_file = {self._resume_prefix(item): item for item in files_tbr}
-                files_tbr = [prefix_to_file[prefix] for prefix in plan["pending_prefixes"] if prefix in prefix_to_file]
-                display_start = int(plan["next_index"])
-                display_total = int(plan["total_files"])
+        try:
+            if metadata_write_mode != "none":
+                exiftool_mgr = get_exiftool_manager()
+                exiftool_mgr.open_persistent_session("photo_processor.process")
+                exiftool_session_opened = True
+
+            # 阶段1: 文件扫描
+            raw_dict, jpg_dict, files_tbr = self._scan_files()
+            
+            # 阶段1.5: V4.0.4 早期连拍检测（只基于时间戳）
+            if self.settings.detect_burst:
+                self.burst_map = self._detect_bursts_early(raw_dict)
+            
+            # 阶段2: RAW转换
+            raw_files_to_convert = self._identify_raws_to_convert(raw_dict, jpg_dict, files_tbr)
+            if raw_files_to_convert:
+                self._convert_raws(raw_files_to_convert, files_tbr)
+
+            files_tbr = self._sort_processing_files(files_tbr)
+            display_start = 1
+            display_total = len(files_tbr)
+            ordered_prefixes = [self._resume_prefix(item) for item in files_tbr]
+            if resume:
+                plan = self.resume_state.get_resume_plan(ordered_prefixes)
+                if plan:
+                    prefix_to_file = {self._resume_prefix(item): item for item in files_tbr}
+                    files_tbr = [prefix_to_file[prefix] for prefix in plan["pending_prefixes"] if prefix in prefix_to_file]
+                    display_start = int(plan["next_index"])
+                    display_total = int(plan["total_files"])
+                else:
+                    self.resume_state.start(ordered_prefixes)
             else:
                 self.resume_state.start(ordered_prefixes)
-        else:
-            self.resume_state.start(ordered_prefixes)
 
-        self._check_cancelled()
-        
-        # 阶段3: AI检测与评分
-        self._process_images(files_tbr, raw_dict, display_start=display_start, display_total=display_total)
-        
-        # 阶段4: 精选旗标计算（metadata_write_mode=none 时跳过）
-        if get_advanced_config().get_metadata_write_mode() != "none":
-            self._calculate_picked_flags()
-        
-        # 阶段5: 文件组织
-        if organize_files:
-            self._move_files_to_rating_folders(raw_dict)
-        
-        # 阶段6: V4.0.4 跨目录连拍合并（在文件整理完成后）
-        if self.settings.detect_burst and self.burst_map and organize_files:
-            burst_stats = self._consolidate_burst_groups(raw_dict)
-            self.stats['burst_groups'] = burst_stats.get('groups', 0)
-            self.stats['burst_moved'] = burst_stats.get('moved', 0)
-        
-        # 阶段7: 临时文件处理
-        if cleanup_temp:
-            self._cleanup_temp_files(files_tbr, raw_dict)
-        else:
-            # V4.0.5: 保留临时文件时，将路径写入数据库
-            self._save_temp_paths_to_db()
+            self._check_cancelled()
             
-        # 阶段8: 清理过期缓存 (V4.1)
-        self._cleanup_expired_cache()
-        
-        # 记录结束时间
-        end_time = time.time()
-        self.stats['end_time'] = end_time
-        self.stats['total_time'] = end_time - start_time
-        self.stats['avg_time'] = (
-            self.stats['total_time'] / self.stats['total']
-            if self.stats['total'] > 0 else 0
-        )
-        
-        # 关闭数据库连接（在所有阶段完成后）
-        if hasattr(self, 'report_db') and self.report_db:
-            self.report_db.close()
-            self.report_db = None
+            # 阶段3: AI检测与评分
+            self._process_images(files_tbr, raw_dict, display_start=display_start, display_total=display_total)
+            
+            # 阶段4: 精选旗标计算（metadata_write_mode=none 时跳过）
+            if metadata_write_mode != "none":
+                self._calculate_picked_flags()
+            
+            # 阶段5: 文件组织
+            if organize_files:
+                self._move_files_to_rating_folders(raw_dict)
+            
+            # 阶段6: V4.0.4 跨目录连拍合并（在文件整理完成后）
+            if self.settings.detect_burst and self.burst_map and organize_files:
+                burst_stats = self._consolidate_burst_groups(raw_dict)
+                self.stats['burst_groups'] = burst_stats.get('groups', 0)
+                self.stats['burst_moved'] = burst_stats.get('moved', 0)
+            
+            # 阶段7: 临时文件处理
+            if cleanup_temp:
+                self._cleanup_temp_files(files_tbr, raw_dict)
+            else:
+                # V4.0.5: 保留临时文件时，将路径写入数据库
+                self._save_temp_paths_to_db()
+                
+            # 阶段8: 清理过期缓存 (V4.1)
+            self._cleanup_expired_cache()
+            
+            # 记录结束时间
+            end_time = time.time()
+            self.stats['end_time'] = end_time
+            self.stats['total_time'] = end_time - start_time
+            self.stats['avg_time'] = (
+                self.stats['total_time'] / self.stats['total']
+                if self.stats['total'] > 0 else 0
+            )
+            
+            # 关闭数据库连接（在所有阶段完成后）
+            if hasattr(self, 'report_db') and self.report_db:
+                self.report_db.close()
+                self.report_db = None
 
-        self.resume_state.clear()
-        
-        return ProcessingResult(
-            stats=self.stats.copy(),
-            file_ratings=self.file_ratings.copy(),
-            star_3_photos=self.star_3_photos.copy(),
-            total_time=self.stats['total_time'],
-            avg_time=self.stats['avg_time']
-        )
+            self.resume_state.clear()
+            
+            return ProcessingResult(
+                stats=self.stats.copy(),
+                file_ratings=self.file_ratings.copy(),
+                star_3_photos=self.star_3_photos.copy(),
+                total_time=self.stats['total_time'],
+                avg_time=self.stats['avg_time']
+            )
+        finally:
+            if exiftool_session_opened and exiftool_mgr is not None:
+                try:
+                    exiftool_mgr.close_persistent_session("photo_processor.process")
+                except Exception as e:
+                    self._log(f"⚠️ ExifTool session close failed: {e}", "warning")
     
     def _scan_files(self) -> Tuple[dict, dict, list]:
         """扫描目录文件"""
@@ -1068,7 +1083,11 @@ class PhotoProcessor:
         inference_pool = ThreadPoolExecutor(max_workers=2)
         
         # BirdID 异步队列：将识别耗时与主处理流程重叠
-        birdid_executor = ThreadPoolExecutor(max_workers=1) if self.settings.auto_identify else None
+        # CPU 推理可多线程并行；MPS/CUDA 设备并发线程安全性有限，保持单线程
+        from config import get_best_device
+        _birdid_device = str(get_best_device())
+        _birdid_workers = 4 if _birdid_device == 'cpu' else 1
+        birdid_executor = ThreadPoolExecutor(max_workers=_birdid_workers) if self.settings.auto_identify else None
         birdid_tasks = deque()
         identify_bird_fn = None
         if self.settings.auto_identify:
@@ -1230,7 +1249,8 @@ class PhotoProcessor:
         if env_yolo_prefetch_raw:
             yolo_prefetch_enabled = env_yolo_prefetch_raw not in {"0", "false", "no", "off"}
         else:
-            yolo_prefetch_enabled = not mps_available
+            # yolo_infer_lock 已串行化所有 YOLO 推理调用，MPS 不存在并发访问风险
+            yolo_prefetch_enabled = True
         
         yolo_prefetch_depth = 3
         env_yolo_prefetch_depth = os.getenv("SUPERPICKY_YOLO_PREFETCH_DEPTH", "").strip()

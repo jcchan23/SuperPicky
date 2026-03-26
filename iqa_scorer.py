@@ -153,8 +153,10 @@ class IQAScorer:
             topiq_model = self._load_topiq()
 
             # BGR → RGB → PIL Image → resize
+            # del img_rgb 在 resize 前释放全分辨率副本，避免 50-70 MB 驻留到推理结束
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(img_rgb)
+            del img_rgb
             img = img.resize((384, 384), Image.LANCZOS)
 
             # 转为张量（复用实例变量）

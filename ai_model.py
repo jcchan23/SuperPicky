@@ -136,13 +136,21 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     try:
         from config import get_best_device
         device = get_best_device()
-        
+
         # 使用最佳设备进行推理
         results = model(image, device=device.type)
     except Exception as device_error:
-        # 设备推理失败，降级到CPU
+        # 设备推理失败，清理 GPU 显存后降级到 CPU
         t = i18n.t if i18n else get_i18n().t
         log_message(t("ai.device_inference_failed", error=device_error), dir)
+        try:
+            import torch
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            elif torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
         try:
             results = model(image, device='cpu')
         except Exception as cpu_error:
@@ -171,7 +179,7 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     # else:
     #     log_message(f"  ⏱️  [2/4] YOLO推理: {yolo_time:.1f}ms", dir)
 
-    # Step 3: 解析检测结果
+    # Step 3: 解析检测结果（立即提取为 numpy，释放 GPU tensor）
     step_start = time.time()
     detections = results[0].boxes.xyxy.cpu().numpy()
     confidences = results[0].boxes.conf.cpu().numpy()
@@ -181,6 +189,9 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
     masks = None
     if hasattr(results[0], 'masks') and results[0].masks is not None:
         masks = results[0].masks.data.cpu().numpy()
+
+    # 数据已转为 numpy，立即释放 YOLO results（含 GPU tensor），避免长批次显存堆积
+    del results
 
     # V4.2: 收集所有检测到的鸟
     all_birds = []

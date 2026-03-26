@@ -756,6 +756,11 @@ class ResultsBrowserWindow(QMainWindow):
             self._update_status(0, 0)
             return
 
+        # 动态刷新鸟种下拉：只显示当前星级筛选下有照片的鸟种
+        use_en = self.i18n.current_lang.startswith('en')
+        species = self._db.get_distinct_species(use_en=use_en, ratings=filters.get('ratings'))
+        self._filter_panel.update_species_list(species)
+
         raw_photos = self._db.get_photos_by_filters(filters)
         resolved_photos = [self._resolve_photo_paths(p) for p in raw_photos]
         self._raw_filtered_photos = resolved_photos
@@ -764,7 +769,7 @@ class ResultsBrowserWindow(QMainWindow):
         filtered = len(resolved_photos)
         self._update_status(total, filtered)
         self._filter_panel.update_count(filtered)
-        
+
         self._update_display_list()
 
     def _update_display_list(self):
@@ -1700,6 +1705,11 @@ class ResultsBrowserWidget(QWidget):
             self._thumb_grid.load_photos([])
             self._update_status(0, 0)
             return
+
+        # 动态刷新鸟种下拉：只显示当前星级筛选下有照片的鸟种
+        use_en = self.i18n.current_lang.startswith('en')
+        species = self._db.get_distinct_species(use_en=use_en, ratings=filters.get('ratings'))
+        self._filter_panel.update_species_list(species)
 
         raw_photos = self._db.get_photos_by_filters(filters)
         self._raw_filtered_photos = [self._resolve_photo_paths(p) for p in raw_photos]

@@ -104,6 +104,25 @@ jobs:
             Copy-Item -Path $foundFiles[0].FullName -Destination release_assets/
           }
 
+      - name: Build code patch zip
+        shell: pwsh
+        run: |
+          $version = .\\.venv\\Scripts\\python.exe -c "from constants import APP_VERSION; print(APP_VERSION)"
+          $patchVersion = "v${version}"
+          $zipName = "code_patch_${patchVersion}.zip"
+
+          $include = @("constants.py", "tools", "core", "ui")
+          $exclude = @("__pycache__", "*.pyc", "*.pyo")
+
+          Compress-Archive -Force -DestinationPath "release_assets/$zipName" -Path ($include | Where-Object { Test-Path $_ })
+
+          $meta = @{
+            patch_version = $patchVersion
+            base_version  = $version
+            applied_at    = (Get-Date -Format "o")
+          } | ConvertTo-Json
+          $meta | Out-File -Encoding utf8 "release_assets/patch_meta.json"
+
       - name: Clean telemetry build override
         if: always()
         shell: pwsh

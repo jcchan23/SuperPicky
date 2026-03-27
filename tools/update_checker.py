@@ -181,8 +181,27 @@ class UpdateChecker:
                 'release_notes': data.get('body', ''),
                 'release_url': data.get('html_url', GITHUB_RELEASES_URL),
                 'published_at': data.get('published_at', ''),
+                'patch_applied': False,
+                'patch_version': None,
             }
-            
+
+            # 没有整包更新时，检查是否有补丁
+            if not has_update:
+                try:
+                    from tools.patch_manager import check_and_apply_patch
+                    patched, msg = check_and_apply_patch(
+                        data.get('assets', []),
+                        self.current_version,
+                    )
+                    update_info['patch_applied'] = patched
+                    update_info['patch_message'] = msg
+                    if patched:
+                        from tools.patch_manager import read_local_meta
+                        meta = read_local_meta()
+                        update_info['patch_version'] = meta.get('patch_version') if meta else None
+                except Exception as e:
+                    update_info['patch_message'] = f'补丁检查异常: {e}'
+
             return has_update, update_info
             
         except urllib.error.URLError as e:

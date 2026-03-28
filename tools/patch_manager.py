@@ -22,6 +22,8 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Dict, Tuple
 
+from config import config, get_app_config_dir, get_patch_dir as shared_get_patch_dir
+
 
 # GitHub Release Asset 文件名
 PATCH_META_FILENAME = "patch_meta.json"
@@ -30,22 +32,17 @@ PATCH_META_FILENAME = "patch_meta.json"
 GITCODE_FILE_BASE = "https://gitcode.com/Jamesphotography/SuperPicky/-/package_files/generic/release"
 
 # 北京镜像服务器（最终兜底）
-MIRROR_BASE_URL = "http://1.119.150.179:59080/superpicky"
+MIRROR_BASE_URL = config.endpoints.MIRROR_BASE_URL
 
 
 def _get_app_data_dir() -> Path:
     """返回 SuperPicky 用户数据目录（跨平台）"""
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "SuperPicky"
-    elif sys.platform == "win32":
-        return Path.home() / "AppData" / "Local" / "SuperPicky"
-    else:
-        return Path.home() / ".config" / "SuperPicky"
+    return get_app_config_dir()
 
 
 def get_patch_dir() -> Path:
     """返回补丁解压目录，注入 sys.path 时使用"""
-    return _get_app_data_dir() / "code_updates"
+    return shared_get_patch_dir()
 
 
 def _get_local_meta_path() -> Path:

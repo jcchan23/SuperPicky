@@ -16,6 +16,7 @@ from packaging import version
 
 # 当前版本号（从 constants.py 统一获取）
 from constants import APP_VERSION
+from config import config
 CURRENT_VERSION = APP_VERSION
 
 # GitHub API 配置
@@ -29,7 +30,7 @@ GITCODE_PROJECT_ID = "Jamesphotography%2FSuperPicky"
 GITCODE_RELEASES_API = f"https://gitcode.com/api/v4/projects/{GITCODE_PROJECT_ID}/releases"
 
 # 北京镜像服务器（最终兜底）
-MIRROR_LATEST_URL = "http://1.119.150.179:59080/superpicky/latest.json"
+MIRROR_LATEST_URL = f"{config.endpoints.MIRROR_BASE_URL}/latest.json"
 
 # 平台+架构对应的 Asset 文件名模式
 # 三层匹配策略：精确架构 > 通用版本 > 任意版本

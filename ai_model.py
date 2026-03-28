@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from tools.utils import log_message
-from config import config
+from config import config, get_lazy_registry
 # V3.2: 移除未使用的 sharpness 计算器导入
 from iqa_scorer import get_iqa_scorer
 from advanced_config import get_advanced_config
@@ -64,17 +64,12 @@ def preprocess_image(image_path, target_size=None):
 
 # V3.2: 移除 _get_sharpness_calculator（锐度现在由 keypoint_detector 计算）
 
-# 初始化全局 IQA 评分器（延迟加载）
-_iqa_scorer = None
-
-
 def _get_iqa_scorer():
     """获取 IQA 评分器单例"""
-    global _iqa_scorer
-    if _iqa_scorer is None:
-        from config import get_best_device
-        _iqa_scorer = get_iqa_scorer(device=get_best_device().type)
-    return _iqa_scorer
+    from config import get_best_device
+    registry = get_lazy_registry()
+    key = f"ai_model.iqa_scorer::{get_best_device().type}"
+    return registry.get_or_create(key, lambda: get_iqa_scorer(device=get_best_device().type))
 
 
 def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n=None, skip_nima=False, focus_point=None, report_db=None):

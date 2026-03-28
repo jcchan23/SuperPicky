@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sys
 from tools.i18n import t as _t
+from config import get_app_config_dir, get_lazy_registry
 
 
 class AdvancedConfig:
@@ -102,18 +103,8 @@ class AdvancedConfig:
         """初始化配置"""
         # 如果没有指定配置文件路径，使用用户目录
         if config_file is None:
-            # 获取用户主目录下的配置目录
-            if sys.platform == "darwin":  # macOS
-                config_dir = Path.home() / "Library" / "Application Support" / "SuperPicky"
-            elif sys.platform == "win32":  # Windows
-                config_dir = Path.home() / "AppData" / "Local" / "SuperPicky"
-            else:  # Linux
-                config_dir = Path.home() / ".config" / "SuperPicky"
-
-            # 创建配置目录（如果不存在）
+            config_dir = get_app_config_dir()
             config_dir.mkdir(parents=True, exist_ok=True)
-
-            # 配置文件路径
             self.config_file = str(config_dir / "advanced_config.json")
         else:
             self.config_file = config_file
@@ -431,13 +422,7 @@ class AdvancedConfig:
         return self.config.copy()
 
 
-# 全局配置实例
-_config_instance = None
-
-
 def get_advanced_config():
     """获取全局配置实例（单例模式）"""
-    global _config_instance
-    if _config_instance is None:
-        _config_instance = AdvancedConfig()
-    return _config_instance
+    registry = get_lazy_registry()
+    return registry.get_or_create("advanced_config.instance", AdvancedConfig)

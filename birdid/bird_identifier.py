@@ -17,7 +17,7 @@ import os
 import sys
 from typing import Optional, List, Dict, Tuple, Set
 from tools.i18n import t as _t
-from config import get_best_device
+from config import get_best_device, get_lazy_registry
 
 # ==================== 设备配置 ====================
 
@@ -90,13 +90,7 @@ DATABASE_PATH = get_birdid_path('data/bird_reference.sqlite')
 YOLO_MODEL_PATH = get_project_path('models/yolo11l-seg.pt')
 
 # ==================== 全局变量（懒加载）====================
-_classifier = None
-_db_manager = None
-_yolo_detector = None
-
-# V4.0.5: 离线物种过滤
-_avonet_filter = None  # AvonetFilter 单例
-
+# 已迁移至 config.get_lazy_registry() 统一管理
 
 # ==================== 模型加密解密 ====================
 
@@ -145,39 +139,41 @@ def _load_torchscript_from_bytes(model_data: bytes):
 
 def get_classifier():
     """懒加载分类模型（OSEA ResNet34）"""
-    global _classifier
-    if _classifier is None:
+    registry = get_lazy_registry()
+
+    def _factory():
         import torchvision.models as models
 
         if os.path.exists(MODEL_PATH):
-            # 加载 OSEA ResNet34 模型
             model = models.resnet34(num_classes=OSEA_NUM_CLASSES)
             state_dict = torch.load(MODEL_PATH, map_location='cpu', weights_only=True)
             model.load_state_dict(state_dict)
             model = model.to(CLASSIFIER_DEVICE)
             model.eval()
-            _classifier = model
             print(f"[BirdID] OSEA ResNet34 model loaded, device: {CLASSIFIER_DEVICE}")
+            return model
+
+        SECRET_PASSWORD = "SuperBirdID_2024_AI_Model_Encryption_Key_v1"
+        if os.path.exists(MODEL_PATH_ENC):
+            model_data = decrypt_model(MODEL_PATH_ENC, SECRET_PASSWORD)
+            model = _load_torchscript_from_bytes(model_data)
+        elif os.path.exists(MODEL_PATH_LEGACY):
+            try:
+                model = torch.jit.load(MODEL_PATH_LEGACY, map_location='cpu')
+            except RuntimeError as e:
+                if 'open file failed' not in str(e) or 'fopen' not in str(e):
+                    raise
+                with open(MODEL_PATH_LEGACY, 'rb') as f:
+                    model_data = f.read()
+                model = _load_torchscript_from_bytes(model_data)
         else:
-            # 回退到旧的 birdid2024 模型
-            SECRET_PASSWORD = "SuperBirdID_2024_AI_Model_Encryption_Key_v1"
-            if os.path.exists(MODEL_PATH_ENC):
-                model_data = decrypt_model(MODEL_PATH_ENC, SECRET_PASSWORD)
-                _classifier = _load_torchscript_from_bytes(model_data)
-            elif os.path.exists(MODEL_PATH_LEGACY):
-                try:
-                    _classifier = torch.jit.load(MODEL_PATH_LEGACY, map_location='cpu')
-                except RuntimeError as e:
-                    if 'open file failed' not in str(e) or 'fopen' not in str(e):
-                        raise
-                    with open(MODEL_PATH_LEGACY, 'rb') as f:
-                        model_data = f.read()
-                    _classifier = _load_torchscript_from_bytes(model_data)
-            else:
-                raise RuntimeError(f"未找到分类模型: {MODEL_PATH} 或 {MODEL_PATH_LEGACY}")
-            _classifier.eval()
-            print(_t("logs.birdid_fallback_model"))
-    return _classifier
+            raise RuntimeError(f"未找到分类模型: {MODEL_PATH} 或 {MODEL_PATH_LEGACY}")
+
+        model.eval()
+        print(_t("logs.birdid_fallback_model"))
+        return model
+
+    return registry.get_or_create("birdid.classifier", _factory)
 
 
 def get_bird_model():
@@ -187,42 +183,48 @@ def get_bird_model():
 
 def get_database_manager():
     """懒加载数据库管理器"""
-    global _db_manager
-    if _db_manager is None:
+    registry = get_lazy_registry()
+
+    def _factory():
         try:
             from birdid.bird_database_manager import BirdDatabaseManager
             if os.path.exists(DATABASE_PATH):
-                _db_manager = BirdDatabaseManager(DATABASE_PATH)
+                return BirdDatabaseManager(DATABASE_PATH)
         except Exception as e:
             print(_t("logs.db_load_failed", e=e))
-            _db_manager = False
-    return _db_manager if _db_manager is not False else None
+        return False
+
+    result = registry.get_or_create("birdid.database_manager", _factory)
+    return result if result is not False else None
 
 
 def get_yolo_detector():
     """懒加载YOLO检测器"""
-    global _yolo_detector
-    if _yolo_detector is None and YOLO_AVAILABLE:
-        if os.path.exists(YOLO_MODEL_PATH):
-            _yolo_detector = YOLOBirdDetector(YOLO_MODEL_PATH)
-    return _yolo_detector
+    if not YOLO_AVAILABLE:
+        return None
+    registry = get_lazy_registry()
+    return registry.get_or_create(
+        "birdid.yolo_detector",
+        lambda: YOLOBirdDetector(YOLO_MODEL_PATH) if os.path.exists(YOLO_MODEL_PATH) else None,
+    )
 
 
 def get_species_filter():
     """懒加载 AvonetFilter（单例模式）"""
-    global _avonet_filter
-    if _avonet_filter is None:
+    registry = get_lazy_registry()
+
+    def _factory():
         try:
             from birdid.avonet_filter import AvonetFilter
-            _avonet_filter = AvonetFilter()
-            if _avonet_filter.is_available():
+            filt = AvonetFilter()
+            if filt.is_available():
                 print(_t("logs.avonet_loaded"))
-            else:
-                _avonet_filter = None
+                return filt
         except Exception as e:
             print(_t("logs.avonet_init_failed", e=e))
-            return None
-    return _avonet_filter
+        return None
+
+    return registry.get_or_create("birdid.avonet_filter", _factory)
 
 
 # ==================== YOLO 鸟类检测器 ====================

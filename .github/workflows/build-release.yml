@@ -106,7 +106,7 @@ jobs:
         shell: pwsh
         run: |
           $version = .\\.venv\\Scripts\\python.exe -c "from constants import APP_VERSION; print(APP_VERSION)"
-          $patchVersion = "v${version}"
+          $patchVersion = "${{ steps.release_meta.outputs.tag }}"
           $zipName = "code_patch_${patchVersion}.zip"
           $zipPath = "release_assets/$zipName"
 
@@ -343,7 +343,7 @@ jobs:
       - name: Build code patch zip
         run: |
           VERSION=$(python3 -c "from constants import APP_VERSION; print(APP_VERSION)")
-          PATCH_VERSION="v${VERSION}"
+          PATCH_VERSION="${{ steps.release_meta.outputs.tag }}"
           ZIP_NAME="code_patch_${PATCH_VERSION}.zip"
 
           zip -r "dist/${ZIP_NAME}" constants.py tools/ core/ ui/ \
@@ -367,7 +367,7 @@ jobs:
           chmod 600 ~/.ssh/mirror_key
 
           VERSION=$(python3 -c "from constants import APP_VERSION; print(APP_VERSION)")
-          PATCH_VERSION="v${VERSION}"
+          PATCH_VERSION="${{ steps.release_meta.outputs.tag }}"
           MIRROR_BASE="http://1.119.150.179:59080/superpicky"
 
           # 生成 latest.json（供中国大陆用户版本查询 fallback）

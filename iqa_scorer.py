@@ -21,7 +21,7 @@ import torchvision.transforms as T
 from topiq_model import CFANet, load_topiq_weights, get_topiq_weight_path
 from tools.i18n import t as _t
 
-from config import get_best_device
+from config import get_best_device, get_lazy_registry
 
 
 class IQAScorer:
@@ -207,10 +207,6 @@ class IQAScorer:
         return aesthetic_score, None
 
 
-# 全局单例
-_iqa_scorer_instance = None
-
-
 def get_iqa_scorer(device='mps') -> IQAScorer:
     """
     获取 IQA 评分器单例
@@ -221,10 +217,8 @@ def get_iqa_scorer(device='mps') -> IQAScorer:
     Returns:
         IQAScorer 实例
     """
-    global _iqa_scorer_instance
-    if _iqa_scorer_instance is None:
-        _iqa_scorer_instance = IQAScorer(device=device)
-    return _iqa_scorer_instance
+    registry = get_lazy_registry()
+    return registry.get_or_create(f"iqa_scorer.instance::{device}", lambda: IQAScorer(device=device))
 
 
 # 便捷函数 (保持向后兼容)

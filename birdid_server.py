@@ -16,6 +16,7 @@ from io import BytesIO
 # 确保模块路径正确
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tools.i18n import t
+from config import config, get_birdid_settings_path
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -37,14 +38,14 @@ app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
 # 全局配置
-DEFAULT_PORT = 5156
-DEFAULT_HOST = '127.0.0.1'
+DEFAULT_PORT = config.server.PORT
+DEFAULT_HOST = config.server.HOST
 
 
 def get_gui_settings():
     """读取 GUI 界面设置的国家/地区过滤"""
     import re
-    settings_path = os.path.expanduser('~/Documents/SuperPicky_Data/birdid_dock_settings.json')
+    settings_path = str(get_birdid_settings_path())
     
     settings = {
         'use_ebird': True,
@@ -119,7 +120,7 @@ def update_gui_settings_from_gps(region_code: str, region_name: str = None):
         region_name: 区域名称（可选，用于显示）
     """
     import json
-    settings_path = os.path.expanduser('~/Documents/SuperPicky_Data/birdid_dock_settings.json')
+    settings_path = str(get_birdid_settings_path())
     
     try:
         # 读取现有设置

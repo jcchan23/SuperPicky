@@ -31,6 +31,7 @@ from PySide6.QtGui import QFont, QPixmap, QIcon, QAction, QTextCursor, QColor, Q
 
 from tools.i18n import get_i18n
 from advanced_config import get_advanced_config
+from config import config as app_config
 from ui.styles import (
     GLOBAL_STYLE, TITLE_STYLE, SUBTITLE_STYLE, VERSION_STYLE, VALUE_STYLE,
     COLORS, FONTS, LOG_COLORS, PROGRESS_INFO_STYLE, PROGRESS_PERCENT_STYLE
@@ -3283,7 +3284,7 @@ class SuperPickyMainWindow(QMainWindow):
                 
                 layout.addSpacing(8)
                 
-                download_url = "https://superpicky.jamesphotography.com.au/#download"
+                download_url = app_config.endpoints.UPDATE_DOWNLOAD_PAGE
                 
                 # 下载按钮区域
                 btn_frame = QFrame()

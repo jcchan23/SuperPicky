@@ -13,6 +13,7 @@ warnings.warn(
 )
 
 import requests
+from config import config
 import json
 import os
 from datetime import datetime, timedelta
@@ -32,7 +33,7 @@ class eBirdCountryFilter:
         self.api_key = api_key
         self.cache_dir = cache_dir
         self.offline_dir = offline_dir
-        self.base_url = "https://api.ebird.org/v2"
+        self.base_url = config.endpoints.EBIRD_API_BASE
         self.headers = {
             'x-ebirdapitoken': api_key
         }
@@ -250,7 +251,7 @@ class eBirdCountryFilter:
         
         # 回退到 Nominatim API（需要网络）
         try:
-            url = "https://nominatim.openstreetmap.org/reverse"
+            url = config.endpoints.NOMINATIM_REVERSE_URL
             params = {
                 'lat': lat,
                 'lon': lon,

@@ -1425,6 +1425,21 @@ class PhotoProcessor:
         elif self._perf_enabled:
             self._log("  ⚙️ EXIF prefetch: off")
 
+        # 周期性 GPU 显存清理间隔（MPS 每 50 张，CUDA 每 200 张）
+        # 提前计算避免在循环内 import torch 引发 UnboundLocalError
+        try:
+            import torch as _torch_module
+            import gc as _gc_module
+            _use_mps = hasattr(_torch_module, 'backends') and _torch_module.backends.mps.is_available()
+            _use_cuda = not _use_mps and _torch_module.cuda.is_available()
+            _cache_interval = 50 if _use_mps else 200
+        except Exception:
+            _torch_module = None
+            _gc_module = None
+            _use_mps = False
+            _use_cuda = False
+            _cache_interval = 200
+
         for local_index in range(1, len(files_tbr) + 1):
             cancel_processing()
             i = display_start + local_index - 1
@@ -1544,22 +1559,17 @@ class PhotoProcessor:
                 progress = int((i / total_files) * 100)
                 self._progress(progress)
 
-            # 周期性 GPU 显存清理（MPS 每 50 张，CUDA 每 200 张）
-            # MPS 不像 CUDA 会自动回收，MacBook 可用内存比 Mac Mini 少，需更频繁清理
-            _cache_interval = 50 if (hasattr(torch, 'backends') and
-                                     torch.backends.mps.is_available()) else 200
-            if i % _cache_interval == 0:
+            if i % _cache_interval == 0 and _torch_module is not None:
                 try:
-                    import torch, gc
-                    if torch.backends.mps.is_available():
-                        torch.mps.empty_cache()
+                    if _use_mps:
+                        _torch_module.mps.empty_cache()
                         self._log(f"  🧹 [第{i}张] MPS 显存已清理", "info")
-                    elif torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    elif _use_cuda:
+                        _torch_module.cuda.empty_cache()
                         self._log(f"  🧹 [第{i}张] CUDA 显存已清理", "info")
                     else:
                         self._log(f"  🧹 [第{i}张] GC 已执行", "info")
-                    gc.collect()
+                    _gc_module.collect()
                 except Exception:
                     pass
             

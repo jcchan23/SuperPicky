@@ -22,6 +22,8 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Dict, Tuple
 
+from config import get_app_config_dir, get_patch_dir as shared_get_patch_dir
+
 
 # GitHub Release Asset 文件名
 PATCH_META_FILENAME = "patch_meta.json"
@@ -29,23 +31,28 @@ PATCH_META_FILENAME = "patch_meta.json"
 # GitCode（中国大陆优先 fallback）
 GITCODE_FILE_BASE = "https://gitcode.com/Jamesphotography/SuperPicky/-/package_files/generic/release"
 
-# 北京镜像服务器（最终兜底）
-MIRROR_BASE_URL = "http://1.119.150.179:59080/superpicky"
+# 北京镜像服务器默认地址（兜底）
+# ⚠️  不在模块级求值，改为函数内延迟读取，避免 import 时强制拉起 config 初始化链
+_MIRROR_BASE_URL_DEFAULT = "http://1.119.150.179:59080/superpicky"
+
+
+def _mirror_base_url() -> str:
+    """延迟读取镜像地址，优先使用 config 覆盖值，避免模块级副作用。"""
+    try:
+        from config import config as _cfg
+        return _cfg.endpoints.MIRROR_BASE_URL
+    except Exception:
+        return _MIRROR_BASE_URL_DEFAULT
 
 
 def _get_app_data_dir() -> Path:
     """返回 SuperPicky 用户数据目录（跨平台）"""
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "SuperPicky"
-    elif sys.platform == "win32":
-        return Path.home() / "AppData" / "Local" / "SuperPicky"
-    else:
-        return Path.home() / ".config" / "SuperPicky"
+    return get_app_config_dir()
 
 
 def get_patch_dir() -> Path:
     """返回补丁解压目录，注入 sys.path 时使用"""
-    return _get_app_data_dir() / "code_updates"
+    return shared_get_patch_dir()
 
 
 def _get_local_meta_path() -> Path:
@@ -224,7 +231,7 @@ def check_and_apply_patch_from_gitcode(
     print(f"[PatchManager] 从 GitCode 下载补丁 {remote_patch_version} ...")
     tmp_path = _download_to_temp(zip_url, timeout=timeout) if zip_url else None
     if not tmp_path:
-        mirror_zip_url = f"{MIRROR_BASE_URL}/code_patch_{remote_patch_version}.zip"
+        mirror_zip_url = f"{_mirror_base_url()}/code_patch_{remote_patch_version}.zip"
         print(f"[PatchManager] GitCode CDN 失败，尝试北京镜像: {mirror_zip_url}")
         tmp_path = _download_to_temp(mirror_zip_url, timeout=timeout)
     if not tmp_path:
@@ -255,7 +262,7 @@ def check_and_apply_patch_from_mirror(
     Returns:
         (patched, message)
     """
-    meta_url = f"{MIRROR_BASE_URL}/patch_meta.json"
+    meta_url = f"{_mirror_base_url()}/patch_meta.json"
     remote_meta = _fetch_json(meta_url, timeout=10)
     if not remote_meta:
         return False, "镜像服务器不可用"
@@ -271,7 +278,7 @@ def check_and_apply_patch_from_mirror(
     if remote_patch_version == local_patch_version:
         return False, f"补丁已是最新（{local_patch_version}）"
 
-    zip_url = f"{MIRROR_BASE_URL}/code_patch_{remote_patch_version}.zip"
+    zip_url = f"{_mirror_base_url()}/code_patch_{remote_patch_version}.zip"
     print(f"[PatchManager] 从镜像下载补丁 {remote_patch_version} ...")
     tmp_path = _download_to_temp(zip_url, timeout=timeout)
     if not tmp_path:
@@ -337,7 +344,7 @@ def check_and_apply_patch(
     print(f"[PatchManager] 下载补丁 {remote_patch_version} ...")
     tmp_path = _download_to_temp(zip_url, timeout=timeout)
     if not tmp_path:
-        mirror_zip_url = f"{MIRROR_BASE_URL}/code_patch_{remote_patch_version}.zip"
+        mirror_zip_url = f"{_mirror_base_url()}/code_patch_{remote_patch_version}.zip"
         print(f"[PatchManager] GitHub CDN 失败，尝试北京镜像: {mirror_zip_url}")
         tmp_path = _download_to_temp(mirror_zip_url, timeout=timeout)
     if not tmp_path:

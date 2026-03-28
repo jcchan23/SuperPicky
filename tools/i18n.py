@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from config import get_lazy_registry
+
 
 def _safe_print(message: str) -> None:
     """避免在非 UTF-8 控制台输出时抛出编码异常。"""
@@ -221,10 +223,6 @@ class I18n:
         return languages
 
 
-# 全局实例
-_i18n_instance: Optional[I18n] = None
-
-
 def get_i18n(lang: str = None) -> I18n:
     """
     获取国际化实例（单例模式）
@@ -235,10 +233,9 @@ def get_i18n(lang: str = None) -> I18n:
     Returns:
         I18n实例
     """
-    global _i18n_instance
-    if _i18n_instance is None:
-        _i18n_instance = I18n(default_lang=lang)
-    return _i18n_instance
+    registry = get_lazy_registry()
+    key = f"i18n.instance::{lang or 'auto'}"
+    return registry.get_or_create(key, lambda: I18n(default_lang=lang))
 
 
 # 便捷函数

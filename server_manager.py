@@ -18,6 +18,7 @@ import threading
 
 # V4.2.1: I18n support
 from tools.i18n import get_i18n
+from config import config, get_app_config_dir, get_lazy_registry
 
 def get_t():
     """Get translator function"""
@@ -33,12 +34,9 @@ def get_t():
 # PID 文件位置
 def get_pid_file_path():
     """获取 PID 文件路径"""
-    if sys.platform == 'darwin':
-        pid_dir = os.path.expanduser('~/Library/Application Support/SuperPicky')
-    else:
-        pid_dir = os.path.expanduser('~/.superpicky')
-    os.makedirs(pid_dir, exist_ok=True)
-    return os.path.join(pid_dir, 'birdid_server.pid')
+    pid_dir = get_app_config_dir()
+    pid_dir.mkdir(parents=True, exist_ok=True)
+    return str(pid_dir / 'birdid_server.pid')
 
 
 def get_server_script_path():
@@ -58,8 +56,11 @@ def is_port_in_use(port, host='127.0.0.1'):
             return False
 
 
-def check_server_health(port=5156, host='127.0.0.1', timeout=2):
+def check_server_health(port=None, host=None, timeout=None):
     """检查服务器健康状态"""
+    port = config.server.PORT if port is None else port
+    host = config.server.HOST if host is None else host
+    timeout = config.server.HEALTH_TIMEOUT_SECONDS if timeout is None else timeout
     try:
         import urllib.request
         import ssl
@@ -121,7 +122,8 @@ def is_process_running(pid):
         return False
 
 
-def get_server_status(port=5156):
+def get_server_status(port=None):
+    port = config.server.PORT if port is None else port
     """
     获取服务器状态
     
@@ -146,12 +148,27 @@ def get_server_status(port=5156):
     }
 
 
-# 全局变量：跟踪线程模式的服务器
-_server_thread = None
-_server_instance = None
+# 全局变量迁移到统一懒加载注册器
 
 
-def start_server_thread(port=5156, log_callback=None):
+def _get_server_thread():
+    return get_lazy_registry().get('server_manager.thread')
+
+
+def _set_server_thread(value):
+    get_lazy_registry().set('server_manager.thread', value)
+
+
+def _get_server_instance():
+    return get_lazy_registry().get('server_manager.instance')
+
+
+def _set_server_instance(value):
+    get_lazy_registry().set('server_manager.instance', value)
+
+
+def start_server_thread(port=None, log_callback=None):
+    port = config.server.PORT if port is None else port
     """
     在线程中启动服务器（用于打包模式）
     
@@ -162,7 +179,6 @@ def start_server_thread(port=5156, log_callback=None):
     Returns:
         tuple: (success: bool, message: str, thread: Thread or None)
     """
-    global _server_thread, _server_instance
     
     def log(msg):
         if log_callback:
@@ -174,7 +190,7 @@ def start_server_thread(port=5156, log_callback=None):
     t = get_t()
     if check_server_health(port):
         log(t("server.server_already_running", port=port))
-        return True, "Server already running", _server_thread
+        return True, "Server already running", _get_server_thread()
     
     try:
         # 导入服务器模块
@@ -184,7 +200,6 @@ def start_server_thread(port=5156, log_callback=None):
         log(t("server.packaged_mode_thread"))
         
         def run_server():
-            global _server_instance
             try:
                 # 异步预加载模型（不阻塞服务器启动）
                 def load_models_async():
@@ -200,25 +215,28 @@ def start_server_thread(port=5156, log_callback=None):
                 model_thread.start()
                 
                 # 立即启动服务器，不等待模型加载完成
-                _server_instance = make_server('127.0.0.1', port, app, threaded=True)
+                _set_server_instance(make_server(config.server.HOST, port, app, threaded=True))
                 log(t("server.server_started", port=port))
-                _server_instance.serve_forever()
+                _get_server_instance().serve_forever()
             except Exception as e:
                 log(t("server.server_thread_error", error=e))
         
         # 创建并启动守护线程
-        _server_thread = threading.Thread(target=run_server, daemon=True, name="BirdID-API-Server")
-        _server_thread.start()
+        server_thread = threading.Thread(target=run_server, daemon=True, name="BirdID-API-Server")
+        _set_server_thread(server_thread)
+        server_thread.start()
         
-        # 等待服务器启动（最多 10 秒，因为服务器启动很快）
-        for i in range(20):
-            time.sleep(0.5)
+        wait_seconds = max(1.0, float(config.server.STARTUP_WAIT_SECONDS))
+        poll_interval = max(0.1, float(config.server.POLL_INTERVAL_SECONDS))
+        max_attempts = max(1, int(wait_seconds / poll_interval))
+        for i in range(max_attempts):
+            time.sleep(poll_interval)
             if check_server_health(port):
                 log(t("server.server_health_ok", port=port))
-                return True, "Server start success", _server_thread
+                return True, "Server start success", _get_server_thread()
         
         log(t("server.server_timeout"))
-        return True, "Server starting", _server_thread
+        return True, "Server starting", _get_server_thread()
         
     except Exception as e:
         log(t("server.thread_start_failed", error=e))
@@ -227,7 +245,8 @@ def start_server_thread(port=5156, log_callback=None):
         return False, str(e), None
 
 
-def start_server_daemon(port=5156, log_callback=None):
+def start_server_daemon(port=None, log_callback=None):
+    port = config.server.PORT if port is None else port
     """
     启动服务器
     
@@ -275,7 +294,8 @@ def start_server_daemon(port=5156, log_callback=None):
         return _start_server_subprocess(port, log_callback)
 
 
-def _start_server_subprocess(port=5156, log_callback=None):
+def _start_server_subprocess(port=None, log_callback=None):
+    port = config.server.PORT if port is None else port
     """
     以子进程方式启动服务器（仅开发模式使用）
     """
@@ -431,8 +451,9 @@ def stop_server(log_callback=None):
         return True, "Server not running"
 
 
-def restart_server(port=5156, log_callback=None):
+def restart_server(port=None, log_callback=None):
     """重启服务器"""
+    port = config.server.PORT if port is None else port
     stop_server(log_callback)
     time.sleep(1)
     return start_server_daemon(port, log_callback)
@@ -445,7 +466,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BirdID 服务器管理器')
     parser.add_argument('action', choices=['start', 'stop', 'restart', 'status'],
                         help='操作: start/stop/restart/status')
-    parser.add_argument('--port', type=int, default=5156, help='端口号')
+    parser.add_argument('--port', type=int, default=config.server.PORT, help='端口号')
     
     args = parser.parse_args()
     

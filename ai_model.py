@@ -235,6 +235,13 @@ def detect_and_draw_birds(image_path, model, output_path, dir, ui_settings, i18n
 
     # 如果没有找到鸟，记录到CSV并返回（V3.1）
     if bird_idx == -1:
+        # 诊断日志：记录 YOLO 实际返回的最高置信度，便于排查跨设备差异
+        if len(confidences) == 0:
+            log_message(f"DEBUG YOLO no_bird: {os.path.basename(image_path)} → 0 detections (all below YOLO conf_thresh=0.25)", dir)
+        else:
+            best_conf = float(confidences.max())
+            best_cls = int(class_ids[confidences.argmax()])
+            log_message(f"DEBUG YOLO no_bird: {os.path.basename(image_path)} → {len(confidences)} detections, best_conf={best_conf:.3f} cls={best_cls} (bird_class={config.ai.BIRD_CLASS_ID})", dir)
         # V3.3: 使用英文列名
         data = {
             "filename": os.path.splitext(os.path.basename(image_path))[0],

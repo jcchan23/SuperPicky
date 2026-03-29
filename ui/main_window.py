@@ -374,8 +374,10 @@ class WorkerThread(threading.Thread):
 
         if len(sub_dirs) <= 1:
             # Single directory mode (original behavior)
+            # 若扫描到的实际目录与根目录不同（根目录无图片、子目录有图片），使用实际目录
+            single_dir = sub_dirs[0] if sub_dirs else self.dir_path
             processor = PhotoProcessor(
-                dir_path=self.dir_path,
+                dir_path=single_dir,
                 settings=settings,
                 callbacks=callbacks
             )

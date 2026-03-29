@@ -932,7 +932,8 @@ class PhotoProcessor:
     def _process_images(self, files_tbr, raw_dict, display_start: int = 1, display_total: int = None):
         """处理所有图片 - AI检测、关键点检测与评分"""
         # 获取模型（已在启动时预加载，此处仅获取引用）
-        model = load_yolo_model()
+        # 用列表包装，使闭包可替换（MPS 周期重载时需要）
+        _yolo_model_box = [load_yolo_model()]
         
         # 初始化 SQLite 报告数据库
         self.report_db = ReportDB(self.dir_path)
@@ -1281,10 +1282,10 @@ class PhotoProcessor:
             }
         
         def run_yolo_detection(in_filepath: str, focus_point: Optional[Tuple[float, float]] = None):
-            # 单模型实例在“预取线程 + 主线程复选”两处复用，串行化推理调用以保证稳定性
+            # 单模型实例在”预取线程 + 主线程复选”两处复用，串行化推理调用以保证稳定性
             with yolo_infer_lock:
                 return detect_and_draw_birds(
-                    in_filepath, model, None, self.dir_path, ui_settings, None,
+                    in_filepath, _yolo_model_box[0], None, self.dir_path, ui_settings, None,
                     skip_nima=True, focus_point=focus_point,
                     report_db=self.report_db
                 )
@@ -1330,10 +1331,34 @@ class PhotoProcessor:
                 'yolo_ms': (time.time() - yolo_start) * 1000,
             }
         
+        # MPS 上每 N 张照片强制重载 YOLO，防止 MPS 显存状态累积导致模型输出崩溃
+        # 经实测：M5 在处理 5000 张时约第 1900 张完全失效，300 张间隔可有效预防
+        _YOLO_MPS_RELOAD_INTERVAL = 300
+
+        def _reload_yolo_if_mps():
+            """在 yolo_infer_lock 保护下重载 YOLO，完整释放旧模型的 MPS 状态。"""
+            if not _use_mps:
+                return
+            with yolo_infer_lock:
+                old_model = _yolo_model_box[0]
+                _yolo_model_box[0] = None
+                del old_model
+                if _torch_module is not None:
+                    try:
+                        _torch_module.mps.empty_cache()
+                        _gc_module.collect()
+                    except Exception:
+                        pass
+                _yolo_model_box[0] = load_yolo_model()
+            self._log(f"  🔄 YOLO 模型已重载（MPS 显存复位）", "info")
+
         if yolo_prefetch_enabled and yolo_result_queue is not None:
             def yolo_prefetch_worker():
                 try:
                     for idx, queued_filename in enumerate(files_tbr, 1):
+                        # MPS 周期重载：在推理前执行，确保新模型处理后续批次
+                        if _use_mps and idx > 1 and (idx - 1) % _YOLO_MPS_RELOAD_INTERVAL == 0:
+                            _reload_yolo_if_mps()
                         yolo_result_queue.put(build_yolo_item(idx, queued_filename))
                 finally:
                     # 结束哨兵，保证主线程可正常退出
@@ -1572,6 +1597,10 @@ class PhotoProcessor:
                     _gc_module.collect()
                 except Exception:
                     pass
+
+            # 非预取模式下的 MPS YOLO 周期重载（预取模式已在 worker 里处理）
+            if (not yolo_prefetch_enabled) and _use_mps and i > 1 and (i - 1) % _YOLO_MPS_RELOAD_INTERVAL == 0:
+                _reload_yolo_if_mps()
             
             result = yolo_item.get('result')
             if result is None:

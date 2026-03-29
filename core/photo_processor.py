@@ -1343,12 +1343,12 @@ class PhotoProcessor:
                 old_model = _yolo_model_box[0]
                 _yolo_model_box[0] = None
                 del old_model
-                if _torch_module is not None:
-                    try:
-                        _torch_module.mps.empty_cache()
-                        _gc_module.collect()
-                    except Exception:
-                        pass
+                try:
+                    import torch, gc
+                    torch.mps.empty_cache()
+                    gc.collect()
+                except Exception:
+                    pass
                 _yolo_model_box[0] = load_yolo_model()
             self._log(f"  🔄 YOLO 模型已重载（MPS 显存复位）", "info")
 

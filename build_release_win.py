@@ -256,7 +256,7 @@ def get_commit_hash() -> str:
     return match.group(1) if match else "unknown"
 
 
-def inject_build_info(commit_hash: str) -> Path | None:
+def inject_build_info(commit_hash: str, release_channel: str = "official") -> Path | None:
     log_step("步骤 1: 注入构建元数据")
     if not BUILD_INFO_FILE.exists():
         logger.warning("未找到 build_info.py，跳过注入")
@@ -272,8 +272,14 @@ def inject_build_info(commit_hash: str) -> Path | None:
         content,
         count=1,
     )
+    updated = re.sub(
+        r'RELEASE_CHANNEL\s*=\s*".*"',
+        f'RELEASE_CHANNEL = "{release_channel}"',
+        updated,
+        count=1,
+    )
     BUILD_INFO_FILE.write_text(updated, encoding="utf-8")
-    logger.info("[成功] 已写入 COMMIT_HASH=%s", commit_hash)
+    logger.info("[成功] 已写入 COMMIT_HASH=%s RELEASE_CHANNEL=%s", commit_hash, release_channel)
     return backup_path
 
 
@@ -678,7 +684,10 @@ def main() -> None:
     ensure_spec_file()
     ensure_inno_templates()
 
-    backup_path = inject_build_info(config.commit_hash)
+    import os as _os
+    _tag = _os.environ.get("RELEASE_TAG", "")
+    _channel = "nightly" if _tag and "-rc" in _tag.lower() else "official"
+    backup_path = inject_build_info(config.commit_hash, _channel)
     try:
         if config.build_type == "cuda-patch":
             run_cuda_patch_build(config)

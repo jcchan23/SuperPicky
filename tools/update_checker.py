@@ -80,7 +80,17 @@ class UpdateChecker:
 
     @property
     def channel(self) -> str:
-        """当前版本渠道：'official' | 'nightly' | 'dev'"""
+        """当前版本渠道：'official' | 'nightly' | 'dev'
+
+        优先读取 build_info.RELEASE_CHANNEL（CI 打包时注入），
+        确保 RC 包（APP_VERSION 为纯数字）能正确识别为 nightly 渠道。
+        """
+        try:
+            from core.build_info import RELEASE_CHANNEL
+            if RELEASE_CHANNEL in ('nightly', 'official'):
+                return RELEASE_CHANNEL
+        except Exception:
+            pass
         return get_version_channel(self.current_version)
 
     def should_check_updates(self) -> bool:

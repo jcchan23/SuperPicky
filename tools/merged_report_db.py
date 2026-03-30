@@ -260,19 +260,15 @@ class MergedReportDB:
         where_clauses = []
         params: List[Any] = []
         
-        # 排除无鸟
-        where_clauses.append("rating != -1")
-        
         ratings = filters.get("ratings")
         if isinstance(ratings, list):
-            ratings = [r for r in ratings if r != -1]
             if not ratings:
                 return []
             placeholders = ", ".join(["?"] * len(ratings))
             where_clauses.append(f"rating IN ({placeholders})")
             params.extend(ratings)
         
-        has_low_rating = isinstance(ratings, list) and any(r <= 0 for r in ratings)
+        has_low_rating = ratings is None or (isinstance(ratings, list) and any(r <= 0 for r in ratings))
         
         focus_statuses = filters.get("focus_statuses")
         if isinstance(focus_statuses, list):

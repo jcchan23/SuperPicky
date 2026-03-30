@@ -848,7 +848,7 @@ class ResultsBrowserWindow(QMainWindow):
                 target_identity = _photo_identity(self._filtered_photos[0])
 
             selected_photo = next(p for p in self._filtered_photos if _photo_identity(p) == target_identity)
-            self._thumb_grid.select_photo(selected_photo)
+            self._thumb_grid.select_photo(selected_photo, ensure_visible=False)
             self._detail_panel.show_photo(selected_photo)
         else:
             self._detail_panel.clear()
@@ -1771,7 +1771,7 @@ class ResultsBrowserWidget(QWidget):
             if not any(_photo_identity(p) == target_identity for p in self._filtered_photos):
                 target_identity = _photo_identity(self._filtered_photos[0])
             selected_photo = next(p for p in self._filtered_photos if _photo_identity(p) == target_identity)
-            self._thumb_grid.select_photo(selected_photo)
+            self._thumb_grid.select_photo(selected_photo, ensure_visible=False)
             self._detail_panel.show_photo(selected_photo)
         else:
             self._detail_panel.clear()

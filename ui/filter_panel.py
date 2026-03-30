@@ -47,7 +47,7 @@ _FOCUS_COLORS = {
 }
 
 # 默认勾选的对焦状态（detail_panel、其他组件参考用）
-_DEFAULT_CHECKED_FOCUS = {"BEST", "GOOD"}
+_DEFAULT_CHECKED_FOCUS = {"BEST", "GOOD", "BAD"}
 
 
 def _section_label(text: str) -> QLabel:
@@ -296,7 +296,7 @@ class FilterPanel(QWidget):
     # ------------------------------------------------------------------
 
     def _build_focus_checkboxes(self) -> QWidget:
-        """3个对焦多选 checkbox（精焦/合焦/失焦），默认精焦+合焦。"""
+        """3个对焦多选 checkbox（精焦/合焦/失焦），默认全选。"""
         _is_zh = not getattr(self.i18n, 'current_lang', 'zh_CN').startswith('en')
 
         w = QWidget()
@@ -305,8 +305,8 @@ class FilterPanel(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
 
-        # 默认勾选 BEST + GOOD
-        _defaults = {"BEST", "GOOD"}
+        # 默认勾选全部对焦状态，避免 burst 结果被默认 focus 再过滤一次
+        _defaults = set(_DEFAULT_CHECKED_FOCUS)
 
         for mode, label_zh, statuses, color in _FOCUS_OPTIONS:
             label = label_zh if _is_zh else mode
@@ -465,8 +465,8 @@ class FilterPanel(QWidget):
         for m, btn in self._rating_btns.items():
             btn.setStyleSheet(self._rating_btn_style(m == _DEFAULT_RATING, m))
 
-        # 对焦 → 默认精焦+合焦
-        _defaults = {"BEST", "GOOD"}
+        # 对焦 → 默认全选
+        _defaults = set(_DEFAULT_CHECKED_FOCUS)
         for mode, cb in self._focus_checks.items():
             cb.blockSignals(True)
             cb.setChecked(mode in _defaults)
@@ -493,10 +493,10 @@ class FilterPanel(QWidget):
         self._emit_filters()
 
     def select_all_ratings(self):
-        """回退：切换到 0星（所有有效照片）。用于默认筛选无结果时。"""
-        self._active_ratings = {"0"}
+        """回退：清空评分筛选，返回所有评分。用于默认筛选无结果时。"""
+        self._active_ratings = set()
         for m, btn in self._rating_btns.items():
-            btn.setStyleSheet(self._rating_btn_style(m == "0", m))
+            btn.setStyleSheet(self._rating_btn_style(False, m))
         self._emit_filters()
 
     # ------------------------------------------------------------------

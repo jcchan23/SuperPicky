@@ -816,6 +816,8 @@ class ThumbnailGrid(QScrollArea):
             photo_key = _photo_key(photo)
             self._cards[photo_key] = card
             self._grid.addWidget(card, row, col)
+            if self._selected_key == photo_key:
+                card.set_selected(True)
             
             # 强制设置行最小高度
             self._grid.setRowMinimumHeight(row, self._thumb_size + 32)
@@ -889,7 +891,7 @@ class ThumbnailGrid(QScrollArea):
         if self._selected_key == photo_key:
             self._selected_key = None
 
-    def select_photo(self, photo_or_key):
+    def select_photo(self, photo_or_key, ensure_visible: bool = True):
         """高亮选中指定照片卡片。"""
         photo_key = _photo_key(photo_or_key) if isinstance(photo_or_key, dict) else photo_or_key
         if self._selected_key and self._selected_key in self._cards:
@@ -897,9 +899,10 @@ class ThumbnailGrid(QScrollArea):
         self._selected_key = photo_key
         if photo_key in self._cards:
             self._cards[photo_key].set_selected(True)
-            # 滚动到可见区域
-            card = self._cards[photo_key]
-            self.ensureWidgetVisible(card)
+            if ensure_visible:
+                # 滚动到可见区域
+                card = self._cards[photo_key]
+                self.ensureWidgetVisible(card)
 
     def select_next(self) -> Optional[dict]:
         """选中下一张，返回 photo dict；已在末尾则返回 None。"""

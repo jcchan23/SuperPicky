@@ -513,11 +513,6 @@ class ReportDB:
         params: List[Any] = []
 
         ratings = filters.get("ratings")
-        requesting_nobird = isinstance(ratings, list) and -1 in ratings
-
-        # 只有未明确请求无鸟照片时才排除 rating=-1
-        if not requesting_nobird:
-            where_clauses.append("rating != -1")
 
         if isinstance(ratings, list):
             if not ratings:
@@ -527,7 +522,7 @@ class ReportDB:
             params.extend(ratings)
 
         # 是否包含低评分（0 星），这类照片 focus_status/is_flying 可能是 NULL
-        has_low_rating = isinstance(ratings, list) and any(r <= 0 for r in ratings)
+        has_low_rating = ratings is None or (isinstance(ratings, list) and any(r <= 0 for r in ratings))
 
         focus_statuses = filters.get("focus_statuses")
         if isinstance(focus_statuses, list):

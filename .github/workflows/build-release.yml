@@ -281,6 +281,9 @@ jobs:
 
           codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Create DMG
         env:
           DEVELOPER_ID: ${{ secrets.MACOS_DEVELOPER_ID }}
@@ -298,18 +301,23 @@ jobs:
             cp -R "SuperBirdIDPlugin.lrplugin" "${DMG_TEMP}/"
           fi
 
-          # Applications 快捷方式（标准拖拽安装体验）
-          ln -s /Applications "${DMG_TEMP}/Applications"
-
           # README 安装说明
           if [ -f "resources/DMG_README.txt" ]; then
             cp "resources/DMG_README.txt" "${DMG_TEMP}/README.txt"
           fi
 
-          hdiutil create -volname "SuperPicky ${VERSION}" \
-            -srcfolder "$DMG_TEMP" \
-            -ov -format UDZO \
-            "dist/${DMG_NAME}"
+          # 使用 create-dmg 生成带 Applications 图标的标准安装 DMG
+          create-dmg \
+            --volname "SuperPicky ${VERSION}" \
+            --window-pos 200 120 \
+            --window-size 580 380 \
+            --icon-size 100 \
+            --icon "SuperPicky.app" 140 180 \
+            --hide-extension "SuperPicky.app" \
+            --app-drop-link 440 180 \
+            --no-internet-enable \
+            "dist/${DMG_NAME}" \
+            "$DMG_TEMP"
 
           rm -rf "$DMG_TEMP"
 

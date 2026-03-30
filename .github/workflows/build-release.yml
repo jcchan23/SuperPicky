@@ -113,8 +113,9 @@ jobs:
           $zipPath = "release_assets/$zipName"
 
           # 7-Zip 在 windows-latest runner 上内置
+          # 排除 build_info*.py（含 COMMIT_HASH / RELEASE_CHANNEL，为打包时注入的构建元数据，不应被 patch 覆盖）
           $items = @("constants.py", "tools", "core", "ui") | Where-Object { Test-Path $_ }
-          & "C:\Program Files\7-Zip\7z.exe" a -tzip $zipPath @items -xr!"__pycache__" -xr!"*.pyc" -xr!"*.pyo" | Out-Null
+          & "C:\Program Files\7-Zip\7z.exe" a -tzip $zipPath @items -xr!"__pycache__" -xr!"*.pyc" -xr!"*.pyo" -xr!"build_info*.py" | Out-Null
 
           $meta = @{
             patch_version = $patchVersion

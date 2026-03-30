@@ -70,6 +70,8 @@ jobs:
 
       - name: Build CPU and CUDA patch release payloads
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
         run: |
           .\.venv\Scripts\python.exe scripts\download_models.py
           .\.venv\Scripts\python.exe build_release_win.py --build-type cuda-patch --copy-dir output --debug --no-zip
@@ -270,12 +272,22 @@ jobs:
         run: python scripts/download_models.py
 
       - name: Inject commit hash and run PyInstaller
+        env:
+          TAG: ${{ steps.release_meta.outputs.tag }}
         run: |
           COMMIT_HASH=$(git rev-parse --short HEAD)
           BUILD_INFO_FILE="core/build_info.py"
 
+          # 判断渠道：纯 vX.Y.Z 为 official，含 -RC 为 nightly
+          if echo "$TAG" | grep -iqE '\-rc'; then
+            RELEASE_CHANNEL="nightly"
+          else
+            RELEASE_CHANNEL="official"
+          fi
+
           cp "$BUILD_INFO_FILE" "${BUILD_INFO_FILE}.backup"
-          sed -i.tmp "s/COMMIT_HASH = None.*/COMMIT_HASH = \"${COMMIT_HASH}\"/" "$BUILD_INFO_FILE"
+          sed -i.tmp "s/COMMIT_HASH = .*/COMMIT_HASH = \"${COMMIT_HASH}\"/" "$BUILD_INFO_FILE"
+          sed -i.tmp "s/RELEASE_CHANNEL = .*/RELEASE_CHANNEL = \"${RELEASE_CHANNEL}\"/" "$BUILD_INFO_FILE"
           rm -f "${BUILD_INFO_FILE}.tmp"
 
           pyinstaller SuperPicky.spec --clean --noconfirm

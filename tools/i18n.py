@@ -38,9 +38,16 @@ class I18n:
             default_lang: 默认语言，如果为None则自动检测系统语言
         """
         if getattr(sys, 'frozen', False):
-            # PyInstaller packaged mode
+            # PyInstaller packaged mode: 基础 locales 来自冻结包
             base_dir = Path(sys._MEIPASS)
+            # 热补丁 locales 覆盖层：code_updates/locales/ 优先于冻结包
+            try:
+                from config import get_patch_dir
+                self._patch_locales_dir: Optional[Path] = get_patch_dir() / "locales"
+            except Exception:
+                self._patch_locales_dir = None
         else:
+            self._patch_locales_dir = None
             # Development mode: handle patch overlay (code_updates/) correctly
             candidate = Path(__file__).parent.parent
             if not (candidate / "locales").exists():
@@ -111,12 +118,11 @@ class I18n:
         return 'en_US'
 
     def _load_translations(self) -> None:
-        """加载当前语言的翻译"""
+        """加载当前语言的翻译，热补丁 locales 覆盖冻结包 locales"""
         locale_file = self.locales_dir / f"{self.current_lang}.json"
 
         if not locale_file.exists():
             _safe_print(f"警告: 语言包 {self.current_lang}.json 不存在，使用默认语言")
-            # 尝试加载fallback语言
             locale_file = self.locales_dir / f"{self.fallback_lang}.json"
             if not locale_file.exists():
                 _safe_print(f"错误: Fallback语言包 {self.fallback_lang}.json 也不存在")
@@ -130,6 +136,31 @@ class I18n:
         except Exception as e:
             _safe_print(f"❌ 加载语言包失败: {e}")
             self.translations = {}
+
+        # 热补丁 locales 覆盖层（仅 frozen 模式）
+        patch_dir = getattr(self, '_patch_locales_dir', None)
+        if patch_dir:
+            patch_file = patch_dir / f"{self.current_lang}.json"
+            if not patch_file.exists():
+                patch_file = patch_dir / f"{self.fallback_lang}.json"
+            if patch_file.exists():
+                try:
+                    import copy
+                    with open(patch_file, 'r', encoding='utf-8') as f:
+                        patch_data = json.load(f)
+                    # 深度合并：patch 的 key 覆盖基础翻译，基础翻译作为兜底
+                    def _deep_merge(base: dict, overlay: dict) -> dict:
+                        result = copy.deepcopy(base)
+                        for k, v in overlay.items():
+                            if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                                result[k] = _deep_merge(result[k], v)
+                            else:
+                                result[k] = v
+                        return result
+                    self.translations = _deep_merge(self.translations, patch_data)
+                    _safe_print(f"✅ Patch locale overlay applied: {patch_file.name}")
+                except Exception as e:
+                    _safe_print(f"⚠️ 补丁语言包覆盖失败: {e}")
 
     def t(self, key: str, **params) -> str:
         """

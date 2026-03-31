@@ -254,6 +254,14 @@ class I18n:
         return languages
 
 
+def set_primary_language(lang: str) -> None:
+    """
+    设置 UI 主语言。主窗口初始化时调用，确保所有 get_i18n() 无参调用
+    都返回与 UI 相同语言的实例，与创建顺序无关。
+    """
+    get_lazy_registry()['_primary_lang'] = lang
+
+
 def get_i18n(lang: str = None) -> I18n:
     """
     获取国际化实例（单例模式）
@@ -265,9 +273,15 @@ def get_i18n(lang: str = None) -> I18n:
         I18n实例
     """
     registry = get_lazy_registry()
-    # 无参数调用时，优先复用主窗口已显式创建的语言实例，
-    # 避免 BirdID 等组件拿到不同 key 的 auto 实例导致语言不一致。
     if lang is None:
+        # 1. 优先返回主窗口显式声明的语言实例（最可靠）
+        primary = registry.get('_primary_lang')
+        if primary:
+            key = f"i18n.instance::{primary}"
+            existing = registry.get(key)
+            if existing is not None:
+                return existing
+        # 2. 兜底：查找任意已存在的显式语言实例
         for candidate_lang in ("zh_CN", "en_US", "zh_TW"):
             candidate_key = f"i18n.instance::{candidate_lang}"
             existing = registry.get(candidate_key)

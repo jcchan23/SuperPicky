@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QObject, Slot, QTimer, QPropertyAnimation, QEasingCurve, QMimeData, QThread
 from PySide6.QtGui import QFont, QPixmap, QIcon, QAction, QTextCursor, QColor, QDragEnterEvent, QDropEvent
 
-from tools.i18n import get_i18n
+from tools.i18n import get_i18n, set_primary_language
 from advanced_config import get_advanced_config
 from config import config as app_config
 from ui.styles import (
@@ -624,6 +624,7 @@ class SuperPickyMainWindow(QMainWindow):
         # 初始化配置和国际化
         self.config = get_advanced_config()
         self.i18n = get_i18n(self.config.language)
+        set_primary_language(self.config.language)  # 让所有 get_i18n() 无参调用返回同一语言
 
         # 状态变量
         self.directory_path = ""

@@ -1,11 +1,11 @@
 {
   "beta": {
-    "tag": "v4.2.5-RC13",
-    "updated_at": "2026-03-31T02:23:15.7752169+00:00",
+    "tag": "v4.2.5-RC14",
+    "updated_at": "2026-03-31T10:10:32.6320416+00:00",
     "files": {
-      "mac_arm64": "SuperPicky_v4.2.5_arm64_236d967.dmg",
-      "win_cpu": "SuperPicky_Setup_Win64_4.2.5_236d967.exe",
-      "win_cuda": "SuperPicky_CUDA_Patch_Win64_4.2.5_236d967.exe"
+      "mac_arm64": "SuperPicky_v4.2.5_arm64_cdf1590.dmg",
+      "win_cpu": "SuperPicky_Setup_Win64_4.2.5_cdf1590.exe",
+      "win_cuda": "SuperPicky_CUDA_Patch_Win64_4.2.5_cdf1590.exe"
     }
   }
 }
